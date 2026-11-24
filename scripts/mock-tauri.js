@@ -4,6 +4,8 @@
 // would. Never part of the app; scripts/shots.mjs injects it.
 //
 //   ?scene=chat|welcome|loading|failed  &lang=en|zh-CN
+//   &fast=1 streams quickly; &demo=1 (scripts/demo-gif.mjs) streams at a
+//   readable pace and leaves out the staging heartbeat below
 // SPDX-License-Identifier: GPL-2.0-only
 (function () {
   const q = new URLSearchParams(location.search);
@@ -87,13 +89,13 @@
       chats += 1;
       // what the 0.1.0 board run saw: a staging heartbeat after "ready"
       // (the last one, 112 of 113). The page must keep Send.
-      if (chats === 1) {
+      if (chats === 1 && !q.get('demo')) {
         snap = { ...snap, state: 'loading', staged: 112, total: 113 };
         (listeners.backend || []).forEach((f) => f({ payload: snap }));
       }
       ch.onmessage({ kind: 'sent' });
       for (const w of answer.split(/(?<=\s)/)) {
-        await new Promise((r) => setTimeout(r, q.get('fast') ? 2 : 30));
+        await new Promise((r) => setTimeout(r, q.get('fast') ? 2 : q.get('demo') ? 45 : 30));
         ch.onmessage({ kind: 'token', text: w });
       }
       ch.onmessage({ kind: 'done', finish: 'stop' });

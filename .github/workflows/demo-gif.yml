@@ -1,0 +1,78 @@
+name: README walkthrough GIF
+
+# Records the README's walkthrough (npm run demo-gif: the built page in
+# Chrome against scripts/mock-tauri.js, fake streamed tokens, no model) in
+# English and Chinese. A push to main force-pushes demo-en.gif and
+# demo-zh-CN.gif as the single commit of the orphan branch readme-media,
+# which the READMEs show. Every recording differs by a few bytes, so
+# committing them to main would add most of a MiB to its history on each
+# push; the orphan branch is replaced instead, so only the newest pair is
+# ever kept. Pull requests and runs on other branches only upload the GIFs
+# as an artifact.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build and record
+        run: |
+          # a CJK font for the Chinese recording, ffmpeg for the GIFs
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk ffmpeg
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          CHROME=$(command -v google-chrome || command -v chromium) npm run demo-gif -- out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-gif
+          path: out/*.gif
+          if-no-files-found: error
+
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: record
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: readme-media
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: demo-gif
+          path: ${{ runner.temp }}/gif
+      - name: Replace the readme-media branch
+        env:
+          GIF: ${{ runner.temp }}/gif
+        run: |
+          set -eu
+          git fetch -q --depth=1 origin +readme-media:refs/remotes/origin/readme-media 2>/dev/null || true
+          git checkout -q --orphan readme-media
+          git rm -rfq .
+          cp "$GIF"/demo-en.gif "$GIF"/demo-zh-CN.gif .
+          git add demo-en.gif demo-zh-CN.gif
+          if git rev-parse -q --verify refs/remotes/origin/readme-media >/dev/null \
+             && [ "$(git write-tree)" = "$(git rev-parse 'refs/remotes/origin/readme-media^{tree}')" ]; then
+            echo "GIFs unchanged"; exit 0
+          fi
+          git config user.name gahingwoo
+          git config user.email gahing@gahingwoo.com
+          git commit -q -s -m "README walkthrough GIFs from ${GITHUB_SHA::7} [skip ci]" \
+            -m "Recorded by the README walkthrough GIF workflow. This branch holds one commit and is replaced every time."
+          git push -q -f origin HEAD:readme-media

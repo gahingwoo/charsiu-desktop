@@ -11,7 +11,8 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "shots": "node scripts/shots.mjs shots",
-    "readme-shots": "node scripts/shots.mjs --readme"
+    "readme-shots": "node scripts/shots.mjs --readme",
+    "demo-gif": "node scripts/demo-gif.mjs"
   },
   "devDependencies": {
     "@patternfly/chatbot": "6.9.0",

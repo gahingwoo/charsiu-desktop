@@ -8,6 +8,8 @@ your conversations on the board and needs no network once the model is
 downloaded. The same app runs on Windows on Arm and on Linux; only the
 charsiu underneath differs.
 
+![Asking a question, the streamed reply, copying it and the history drawer](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-en.gif)
+
 | | |
 |---|---|
 | ![A conversation with a code block](docs/imgs/chat-en.webp) | ![The welcome prompts, in Chinese](docs/imgs/welcome-zh.webp) |
@@ -136,6 +138,13 @@ The pictures in this README are rendered the same way:
 workflow uploads a fresh set as the `readme-images` artifact on every push,
 and the "Update README pictures" workflow (`readme-shots.yml`, run by hand)
 renders and commits them.
+
+The walkthrough GIF at the top is recorded by `npm run demo-gif` (the same
+page and stand-in, driven through Chrome, frames from its screencast,
+ffmpeg for the GIF; needs `ffmpeg` on the PATH). The "README walkthrough
+GIF" workflow (`demo-gif.yml`) records it in English and Chinese on every
+push to main and force-pushes them as the only commit of the `readme-media`
+branch, so the GIFs never add to the history of main.
 
 `python3 tools/make-icons.py` redraws the icons.
 
