@@ -1,6 +1,6 @@
 name: Build
 
-# Every push: the page (typecheck, build, its size), lint and tests,
+# Every push: the page (typecheck, tests, build, its size), lint and tests,
 # screenshots of the page against a stand-in for the app, the Windows arm64
 # installer (NSIS) and the Linux arm64 .deb (and an AppImage, best effort).
 # A push to main puts the three on the rolling `ci` pre-release (in place,
@@ -43,6 +43,7 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm run typecheck
+          npm test
           npm run build
       - name: No dashes in text
         run: |

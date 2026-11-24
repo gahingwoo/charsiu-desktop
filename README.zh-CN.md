@@ -2,9 +2,9 @@
 
 [English](README.md)
 
-[charsiu](https://github.com/gahingwoo/charsiu) 的聊天窗口。charsiu 是在 RK3576 NPU 上运行大模型的开源运行时。模型在开发板的 NPU 上运行，对话保存在开发板上，模型下载好之后不需要联网。同一个程序可在 Windows on Arm 和 Linux 上运行，只是下面的 charsiu 不同。
+[charsiu](https://github.com/gahingwoo/charsiu) 的聊天窗口。charsiu 是在 RK3576 NPU 上运行大模型的开源运行时。模型在开发板的 NPU 上运行，对话保存在开发板上（可导出为 Markdown 文件，不会上传），模型下载好之后不需要联网。同一个程序可在 Windows on Arm 和 Linux 上运行，只是下面的 charsiu 不同。
 
-![提问、流式回答、复制回答和对话历史](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-zh-CN.gif)
+![提问、流式回答、复制回答、导出为 Markdown 和对话历史](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-zh-CN.gif)
 
 | | |
 |---|---|

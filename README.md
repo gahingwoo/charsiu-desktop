@@ -8,7 +8,7 @@ your conversations on the board and needs no network once the model is
 downloaded. The same app runs on Windows on Arm and on Linux; only the
 charsiu underneath differs.
 
-![Asking a question, the streamed reply, copying it and the history drawer](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-en.gif)
+![Asking a question, the streamed reply, copying it, exporting it as Markdown and the history drawer](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-en.gif)
 
 | | |
 |---|---|
@@ -83,6 +83,9 @@ The app is a front end and nothing more. It does not contain a model runtime.
 - Conversations and settings are JSON files in the app's data directory
   (`%APPDATA%\com.gahingwoo.charsiu-desktop`,
   `~/.local/share/com.gahingwoo.charsiu-desktop`).
+- A conversation exports as a Markdown file (the title, the date, then each
+  turn, code blocks as they were) to wherever the save dialog points. Nothing
+  is uploaded.
 
 Tauri 2 with the system web view (WebView2 on Windows 11, WebKitGTK on
 Linux), because the board has 4 GB of memory and charsiu needs most of it.
@@ -90,8 +93,8 @@ Linux), because the board has 4 GB of memory and charsiu needs most of it.
 The page is React and the [PatternFly Chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview)
 extension, laid out as its "Fullscreen chatbot with docked navigation"
 demo: a docked rail (the conversation history toggle, the logo, New
-conversation, Settings), the conversation history drawer (new chat, search,
-rename, delete), the message box (markdown, code blocks with copy, the typing
+conversation, Export, Settings), the conversation history drawer (new chat,
+search, rename, export, delete), the message box (markdown, code blocks with copy, the typing
 indicator while a reply is read, copy and regenerate on a reply, problems as
 alerts above the conversation), the welcome prompt, the message bar (send,
 and stop while charsiu answers) and the footnote, which carries the status in

@@ -101,3 +101,13 @@ html.pf-v6-theme-dark .credit-badge__label { fill: var(--pf-t--global--text--col
 
 /* Regular-weight headings in the dialogs, the house style. */
 .regular { font-weight: var(--pf-t--global--font--weight--body--default); }
+.export-path { word-break: break-all; }
+
+/* The rail's Export with nothing to export: dimmed, still focusable for its tooltip. */
+.pf-chatbot__canvas-docked-nav .pf-v6-c-nav__link[aria-disabled="true"] {
+  --pf-v6-c-nav__link-icon--Color: var(--pf-t--global--icon--color--disabled);
+  --pf-v6-c-nav__link-icon--hover--Color: var(--pf-t--global--icon--color--disabled);
+  --pf-v6-c-nav__link--BackgroundColor: transparent;
+  --pf-v6-c-nav__link--hover--BackgroundColor: transparent;
+  cursor: default;
+}

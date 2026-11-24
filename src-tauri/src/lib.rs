@@ -3,6 +3,7 @@
 // charsiu desktop: a chat window over `charsiu serve`.
 
 mod backend;
+mod export;
 mod http;
 mod models;
 mod npu;
@@ -191,8 +192,21 @@ fn save_conversations(app: AppHandle, value: serde_json::Value) -> Result<(), St
     store::write(&app, "conversations.json", &value)
 }
 
+/// Save a conversation, already Markdown, where the user picks. The
+/// dialog blocks, so not on the main thread: an async command.
+#[tauri::command]
+async fn export_markdown(
+    app: AppHandle,
+    title: String,
+    name: String,
+    text: String,
+) -> Result<Option<String>, String> {
+    blocking(move || export::save(&app, &title, &name, &text)).await?
+}
+
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(App::default())
         .invoke_handler(tauri::generate_handler![
             app_info,
@@ -211,6 +225,7 @@ pub fn run() {
             load_data,
             save_settings,
             save_conversations,
+            export_markdown,
             open_url,
         ])
         .build(tauri::generate_context!())

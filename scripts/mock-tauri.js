@@ -82,6 +82,12 @@
     }),
     save_settings: () => null,
     save_conversations: () => null,
+    // the save dialog answers at once with the name it was offered;
+    // scripts/shots.mjs reads what was written from window.__exports
+    export_markdown: (args) => {
+      (window.__exports = window.__exports || []).push(args);
+      return new Promise((r) => setTimeout(() => r(`C:\\Users\\board\\Documents\\${args.name}`), q.get('demo') ? 600 : 50));
+    },
     open_url: () => null,
     chat_cancel: () => null,
     chat: async (args) => {

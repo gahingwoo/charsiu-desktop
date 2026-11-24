@@ -10,6 +10,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-strip-types --test test/*.test.mjs",
     "shots": "node scripts/shots.mjs shots",
     "readme-shots": "node scripts/shots.mjs --readme",
     "demo-gif": "node scripts/demo-gif.mjs"
