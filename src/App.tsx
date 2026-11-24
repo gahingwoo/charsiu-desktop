@@ -1,17 +1,18 @@
 // Charsiu Desktop, the page: the PatternFly Chatbot extension's "Fullscreen
 // chatbot with docked navigation" demo (the chatbot fills the window, a
-// docked rail with the history toggle, the logo, New chat and Settings; the
+// docked rail with the history toggle, the logo, New chat, Export and Settings; the
 // history drawer; the message box, message bar and footnote; settings drawn in
 // place of the conversation), with this app's content. Everything that
 // touches the system is a Rust command (src/api.ts); this keeps the conversations and draws.
 // SPDX-License-Identifier: GPL-2.0-only
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
-  AlertActionLink, Brand, CodeBlock, CodeBlockCode, Content, Divider, DropdownItem, Masthead, MastheadBrand, MastheadContent,
+  Alert, AlertActionCloseButton, AlertActionLink, AlertGroup, Brand, CodeBlock, CodeBlockCode, Content, Divider, DropdownItem, Masthead, MastheadBrand, MastheadContent,
   MastheadLogo, MastheadMain, MastheadToggle, Nav, NavItem, NavList, PageToggleButton, Progress, ProgressMeasureLocation,
   ProgressSize, Tooltip,
 } from '@patternfly/react-core';
 import { RhUiEditFillIcon } from '@patternfly/react-icons/dist/esm/icons/rh-ui-edit-fill-icon';
+import { RhUiExportFillIcon } from '@patternfly/react-icons/dist/esm/icons/rh-ui-export-fill-icon';
 import { RhUiSettingsFillIcon } from '@patternfly/react-icons/dist/esm/icons/rh-ui-settings-fill-icon';
 import { RedoIcon } from '@patternfly/react-icons/dist/esm/icons/redo-icon';
 import Chatbot, { ChatbotDisplayMode } from '@patternfly/chatbot/dist/dynamic/Chatbot';
@@ -28,6 +29,7 @@ import {
   type ChatEvent, type Conv, type Info, type Models, type Msg, type NpuStatus, type PullStatus, type Settings, type Snapshot,
 } from './api';
 import { useI18n } from './i18n';
+import { fileName, toMarkdown } from './export';
 import type { T } from './i18n-core';
 import { applyTheme, followSystem } from './theme';
 import { AboutModal, ConfirmDelete, LogModal, RenameModal, SettingsModal } from './dialogs';
@@ -133,6 +135,8 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [areSettingsOpen, setAreSettingsOpen] = useState(false);
   const newChatRef = useRef<HTMLAnchorElement>(null);
+  const exportRef = useRef<HTMLAnchorElement>(null);
+  const [toast, setToast] = useState<{ variant: 'success' | 'danger'; title: string; body?: string } | null>(null);
   const messageBoxRef = useRef<MessageBoxHandle>(null);
   const settingsNavRef = useRef<HTMLAnchorElement>(null);
   const [search, setSearch] = useState('');
@@ -373,6 +377,21 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   };
 
 
+  // ---- export: the conversation as a Markdown file, where the user picks
+
+  const exportConv = async (c: Conv) => {
+    if (!tauri() || !c.messages.some((m) => m.content.trim())) return;
+    const text = toMarkdown(c, { untitled: t('conv.untitled'), you: t('export.you'), assistant: t('export.assistant'), colon: t('export.colon') });
+    try {
+      const path = await invoke<string | null>('export_markdown', {
+        title: t('export.dialog'), name: fileName(titleOf(c, t), t('export.fallback')), text,
+      });
+      if (path) setToast({ variant: 'success', title: t('export.saved'), body: path });
+    } catch (e) {
+      setToast({ variant: 'danger', title: t('export.failed'), body: String(e) });
+    }
+  };
+
   // ---- models
 
   const useModel = (path: string) => {
@@ -395,6 +414,8 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
       label: t('conv.actions', { title: titleOf(c, t) }),
       menuItems: [
         <DropdownItem key="rename" value="rename" onClick={() => setRenaming(c)}>{t('conv.rename')}</DropdownItem>,
+        <DropdownItem key="export" value="export" isDisabled={!c.messages.some((m) => m.content.trim())}
+          onClick={() => exportConv(c)}>{t('export.menu')}</DropdownItem>,
         <DropdownItem key="delete" value="delete" isDanger isDisabled={generating && c.id === currentId}
           onClick={() => setDeleting(c)}>{t('common.delete')}</DropdownItem>,
       ],
@@ -535,6 +556,8 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     ...installed.map((m) => ({ value: m.path, label: modelName(m.file) })),
   ];
 
+  const canExport = !!current && current.messages.some((m) => m.content.trim()) && !generating;
+
   const openSettings = () => { setIsDrawerOpen(false); setAreSettingsOpen(true); };
   const closeSettings = () => {
     setAreSettingsOpen(false);
@@ -592,6 +615,18 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                 >
                   {t('conv.new')}
                 </NavItem>
+                <NavItem
+                  itemId="export"
+                  aria-label={t('export.current')}
+                  icon={<RhUiExportFillIcon />}
+                  component="button"
+                  preventDefault
+                  anchorRef={exportRef}
+                  aria-disabled={!canExport}
+                  onClick={() => { if (current && canExport) exportConv(current); }}
+                >
+                  {t('export.current')}
+                </NavItem>
               </NavList>
               <NavList className="pf-v6-u-mt-auto">
                 <NavItem
@@ -608,6 +643,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
               </NavList>
             </Nav>
             <Tooltip aria="none" aria-live="off" triggerRef={newChatRef} content={t('conv.new')} />
+            <Tooltip aria="none" aria-live="off" triggerRef={exportRef} content={t('export.current')} />
             <Tooltip aria="none" aria-live="off" triggerRef={settingsNavRef} content={t('menu.settings')} />
           </MastheadContent>
         </Masthead>
@@ -726,6 +762,15 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
           />
         </div>
       </Chatbot>
+      <AlertGroup isToast isLiveRegion>
+        {toast && (
+          <Alert variant={toast.variant} title={toast.title} timeout={toast.variant === 'success' ? 6000 : false}
+            onTimeout={() => setToast(null)}
+            actionClose={<AlertActionCloseButton title={toast.title} onClose={() => setToast(null)} />}>
+            {toast.body && <p className="export-path">{toast.body}</p>}
+          </Alert>
+        )}
+      </AlertGroup>
       {dialog === 'models' && (
         <ModelsModal models={models} error={modelsError} pull={pull} setPull={setPull} settings={settings} backend={backend}
           onRefresh={refreshModels} onUse={(p) => { useModel(p); setDialog(''); }} onClose={() => setDialog('')} />

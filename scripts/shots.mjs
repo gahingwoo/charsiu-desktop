@@ -120,6 +120,52 @@ if (!readme) {
   await ctx.close();
 }
 
+// Export as Markdown: the rail's button for the open conversation, and the
+// history menu's item for any other. What reaches the save dialog is the
+// Markdown itself; mock-tauri.js keeps it in window.__exports.
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await ctx.addInitScript(mock);
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(`export: ${e.message}`));
+  await page.goto(`${base}?scene=welcome&lang=en`);
+  await page.waitForSelector('.pf-chatbot');
+  if (await page.getAttribute('.pf-chatbot__canvas-docked-nav button[aria-label="Export conversation"]', 'aria-disabled') !== 'true') {
+    errors.push('export: the rail offers Export with no conversation');
+  }
+  await page.goto(`${base}?scene=chat&lang=en`);
+  await page.waitForSelector('.msg-stats');
+  await page.click('.pf-chatbot__canvas-docked-nav button[aria-label="Export conversation"]');
+  await page.waitForSelector('.pf-v6-c-alert-group .pf-m-success', { timeout: 5000 })
+    .catch(() => errors.push('export: no success alert'));
+  const [sent] = await page.evaluate(() => window.__exports || []);
+  if (!sent) errors.push('export: export_markdown was not called');
+  else {
+    if (sent.name !== 'What is an NPU.md') errors.push(`export: offered the name ${sent.name}`);
+    for (const want of ['# What is an NPU\n\n', '\n\n**You:**\n\nWhat is an NPU?', '\n\n**Assistant:**\n\nAn NPU', '```python\ndef reverse(s: str) -> str:\n    return s[::-1]\n']) {
+      if (!sent.text.includes(want)) errors.push(`export: the Markdown lacks ${JSON.stringify(want)}`);
+    }
+  }
+  await page.screenshot({ path: join(out, 'export-light-en.png') });
+  // the history menu: the open one can be exported, an empty one cannot
+  await history(page);
+  const menuOf = async (title) => {
+    await page.click(`[aria-label="Actions for ${title}"]`);
+    return page.getByRole('menuitem', { name: 'Export as Markdown' });
+  };
+  const empty = await menuOf('Translate a paragraph');
+  if (!(await empty.isDisabled())) {
+    errors.push('export: an empty conversation offers Export');
+  }
+  await page.keyboard.press('Escape');
+  await (await menuOf('What is an NPU')).click();
+  await page.waitForFunction(() => (window.__exports || []).length === 2, null, { timeout: 5000 })
+    .catch(() => errors.push('export: the history menu did not export'));
+  await page.screenshot({ path: join(out, 'export-history-light-en.png') });
+  console.log('export-light-en.png, export-history-light-en.png');
+  await ctx.close();
+}
+
 }
 
 await browser.close();

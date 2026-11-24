@@ -46,6 +46,7 @@ const cursor = `addEventListener('DOMContentLoaded', () => {
   addEventListener('mouseup', () => { c.style.transform = ''; }, true);
 });`;
 
+const exportItem = { en: 'Export as Markdown', 'zh-CN': '导出为 Markdown' };
 const question = { en: 'What is an NPU? And write a Python function that reverses a string.', 'zh-CN': '什么是 NPU？再写一个反转字符串的 Python 函数。' };
 
 async function record(lang) {
@@ -95,16 +96,32 @@ async function record(lang) {
   await page.waitForFunction(() => document.querySelectorAll('.msg-stats').length >= 1, null, { timeout: 30000 });
   await page.waitForTimeout(1500);
 
-  // Copy the reply, then the history drawer: the conversation is kept.
+  // Copy the reply, export it as Markdown from the rail, then the history
+  // drawer: the conversation is kept, and its menu exports it too.
   for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(40); }
   await page.waitForTimeout(500);
   const copy = page.locator('.pf-chatbot__response-actions .pf-chatbot__button--response-action').first();
   await goto(copy);
   await page.mouse.click(x, y);
   await page.waitForTimeout(1300);
+  await goto(page.locator('.pf-chatbot__canvas-docked-nav .pf-v6-c-nav__list').first().locator('button').nth(1));
+  await page.waitForTimeout(500);
+  await page.mouse.click(x, y);
+  await page.waitForSelector('.pf-v6-c-alert-group .pf-m-success', { timeout: 5000 });
+  await page.waitForTimeout(2200);
+  await page.locator('.pf-v6-c-alert-group .pf-v6-c-alert__action button').click();
   await goto(page.locator('.pf-chatbot__canvas-history-toggle'));
   await page.mouse.click(x, y);
+  await page.waitForTimeout(1300);
+  await goto(page.locator('.pf-chatbot__history-actions').first());
+  await page.mouse.click(x, y);
+  await page.waitForTimeout(800);
+  await goto(page.getByRole('menuitem', { name: exportItem[lang] }));
+  await page.waitForTimeout(500);
+  await page.mouse.click(x, y);
+  await page.waitForSelector('.pf-v6-c-alert-group .pf-m-success', { timeout: 5000 });
   await page.waitForTimeout(2500);
+  if (await page.evaluate(() => (window.__exports || []).length) !== 2) throw new Error(`${lang}: two exports expected`);
 
   await cdp.send('Page.stopScreencast');
   await ctx.close();
