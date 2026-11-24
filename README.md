@@ -93,7 +93,7 @@ Windows (TaishanPi 3M, Windows 11 23H2 arm64):
 1. Install charsiu: `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
    (or the branch build the release notes name). Check `charsiu "hello"` in a
    new terminal.
-2. Run the installer `Charsiu Desktop_0.1.0_arm64-setup.exe` from the
+2. Run the installer `Charsiu Desktop_0.1.1_arm64-setup.exe` from the
    `charsiu-desktop-windows-arm64` artifact. It installs for the current user;
    WebView2 is already part of Windows 11.
 3. Start Charsiu Desktop from the Start menu. Expected, in the footnote under
@@ -126,7 +126,7 @@ Linux (Armbian edge with rocket, or any arm64 Debian/Ubuntu with charsiu):
 
 1. `sudo apt install charsiu` (Armbian) or charsiu's installer, then
    `charsiu "hello"`.
-2. `sudo apt install ./charsiu-desktop_0.1.0_arm64.deb` from the
+2. `sudo apt install ./charsiu-desktop_0.1.1_arm64.deb` from the
    `charsiu-desktop-linux-arm64-deb` artifact.
 3. Start Charsiu Desktop from the menu and repeat steps 3 to 6 above. NPU shows
    "rocket driver loaded, 2 of 2 cores active" while it answers.

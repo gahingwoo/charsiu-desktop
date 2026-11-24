@@ -1,6 +1,6 @@
 [package]
 name = "charsiu-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "A chat window for charsiu, the open LLM runtime for the RK3576 NPU"
 authors = ["gahingwoo <gahing@gahingwoo.com>"]
 license = "GPL-2.0-only"

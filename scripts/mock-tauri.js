@@ -37,6 +37,7 @@
   };
   const failed = { state: 'failed', npu: 'unknown', problem: 'no_model', detail: 'charsiu serve: no model set and none here. Try: charsiu pull' };
   let snap = scene === 'failed' ? failed : ready;
+  let chats = 0;
 
   const zoo = [
     ['smollm2-135m-q4', 92, 'smallest thing that talks; good for a first run'],
@@ -82,9 +83,16 @@
     chat_cancel: () => null,
     chat: async (args) => {
       const ch = args.onEvent;
+      chats += 1;
+      // what the 0.1.0 board run saw: a staging heartbeat after "ready"
+      // (the last one, 112 of 113). The page must keep Send.
+      if (chats === 1) {
+        snap = { ...snap, state: 'loading', staged: 112, total: 113 };
+        (listeners.backend || []).forEach((f) => f({ payload: snap }));
+      }
       ch.onmessage({ kind: 'sent' });
       for (const w of answer.split(/(?<=\s)/)) {
-        await new Promise((r) => setTimeout(r, 30));
+        await new Promise((r) => setTimeout(r, q.get('fast') ? 2 : 30));
         ch.onmessage({ kind: 'token', text: w });
       }
       ch.onmessage({ kind: 'done', finish: 'stop' });

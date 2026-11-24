@@ -160,6 +160,7 @@ export const MESSAGES: Dict = {
   "menu.manageModels": { en: "Manage models", 'zh-CN': "管理模型" },
   "model.label": { en: "Model", 'zh-CN': "模型" },
   "chat.botWord": { en: "AI", 'zh-CN': "AI" },
+  "chat.noReply": { en: "charsiu serve closed the reply without an answer", 'zh-CN': "charsiu serve 没有给出回答就结束了" },
   "chat.regenerate": { en: "Regenerate", 'zh-CN': "重新生成" },
   "chat.loadingWord": { en: "Reading the conversation", 'zh-CN': "正在读取对话" },
   "chat.placeholderWait": { en: "charsiu serve is not ready yet", 'zh-CN': "charsiu serve 还没就绪" },

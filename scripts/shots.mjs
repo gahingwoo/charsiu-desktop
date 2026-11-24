@@ -55,6 +55,31 @@ await shot('models-dark-en', {
 });
 await shot('failed-light-en', { scene: 'failed' });
 
+// Two questions in a row must both be answered: after the first reply Send
+// stays available, even when a staging heartbeat arrives after "ready"
+// (Charsiu Desktop 0.1.0 on the board kept Send disabled after one reply).
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await ctx.addInitScript(mock);
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(`two-prompts: ${e.message}`));
+  await page.goto(`${base}?scene=welcome&lang=en&fast=1`);
+  const box = page.locator('textarea');
+  for (const [i, q] of ['First question', 'Second question'].entries()) {
+    await box.waitFor();
+    await page.waitForFunction(() => !document.querySelector('textarea')?.disabled);
+    await box.fill(q);
+    await box.press('Enter');
+    await page.waitForFunction((n) => document.querySelectorAll('.msg-stats').length >= n, i + 1, { timeout: 20000 })
+      .catch(() => errors.push(`two-prompts: reply ${i + 1} never finished`));
+  }
+  const replies = await page.locator('.msg-stats').count();
+  if (replies !== 2) errors.push(`two-prompts: ${replies} answered replies, expected 2`);
+  await page.screenshot({ path: join(out, 'two-prompts-light-en.png') });
+  console.log(`two-prompts-light-en.png (${replies} replies)`);
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 if (errors.length) {

@@ -1,7 +1,7 @@
 {
   "name": "charsiu-desktop",
   "productName": "Charsiu Desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Desktop chat app for charsiu on the RK3576 NPU, Windows and Linux",
   "license": "GPL-2.0-only",
   "author": "Ga Hing Woo <gahing@gahingwoo.com>",

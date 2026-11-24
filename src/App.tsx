@@ -42,6 +42,7 @@ const DISPLAY = ChatbotDisplayMode.embedded;
 // ---- words for the state ---------------------------------------------------------
 
 export function stateText(b: Snapshot, t: T): string {
+  if (b.state === 'loading' && b.port) return t('state.ready');
   if (b.state === 'loading' && b.total) return t('state.loadingN', { n: b.staged || 0, total: b.total });
   return t(`state.${b.state || 'stopped'}`);
 }
@@ -103,7 +104,9 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   const [models, setModels] = useState<Models | null>(null);
   const [modelsError, setModelsError] = useState('');
   const [pull, setPull] = useState<PullStatus | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGeneratingState] = useState(false);
+  const generatingRef = useRef(false);
+  const setGenerating = (v: boolean) => { generatingRef.current = v; setGeneratingState(v); };
   const [drawer, setDrawer] = useState(false);
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState<'' | 'models' | 'settings' | 'lang' | 'about' | 'log'>('');
@@ -139,6 +142,10 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   currentIdRef.current = currentId;
 
   const current = convs.find((c) => c.id === currentId) ?? null;
+  // A server that has said its port is serving. A staging heartbeat after
+  // that (the last one for 113 tensors is 112) must never take Send away:
+  // that was the 0.1.0 board bug.
+  const serving = backend.state === 'ready' || (backend.state === 'loading' && !!backend.port);
 
   // ---- the backend
 
@@ -304,6 +311,10 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     });
     try {
       await invoke('chat', { body: JSON.stringify(body), onEvent: ch });
+      // The command has returned, so the reply is over and Send must come
+      // back even if no "done" arrives. Channel messages can trail the
+      // command's own answer, so give them a moment first.
+      window.setTimeout(() => finish(n ? 'stop' : 'error', n ? undefined : t('chat.noReply')), 1500);
     } catch (e) {
       finish('error', String(e));
     }
@@ -311,7 +322,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
 
   const send = (raw: string | number) => {
     const text = String(raw).trim();
-    if (!text || generating || backend.state !== 'ready' || !tauri()) return;
+    if (!text || generatingRef.current || !serving || !tauri()) return;
     const c = ensureConversation();
     const user: Msg = { id: uid(), role: 'user', content: text, at: Date.now() };
     const conv = convsRef.current.find((x) => x.id === c.id) ?? c;
@@ -321,7 +332,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   const stop = () => { if (tauri()) invoke('chat_cancel').catch(() => {}); };
 
   const regenerate = () => {
-    if (!current || generating || backend.state !== 'ready') return;
+    if (!current || generatingRef.current || !serving) return;
     const ms = current.messages;
     let end = ms.length;
     while (end > 0 && ms[end - 1].role === 'assistant') end -= 1;
@@ -603,9 +614,9 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                   {!msgs.length && (
                     <>
                       <ChatbotWelcomePrompt title={t('welcome.title')} description={
-                        backend.state === 'ready' ? t('welcome.description')
+                        serving ? t('welcome.description')
                           : backend.state === 'starting' || backend.state === 'loading' ? t('chat.emptyLoading') : t('chat.emptyStopped')}
-                        prompts={backend.state === 'ready' ? welcome : []} />
+                        prompts={serving ? welcome : []} />
                       {(backend.state === 'starting' || backend.state === 'loading') && (
                         <div className="loading">
                           {loadingProgress != null
@@ -636,7 +647,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                           error={m.error ? { title: t('chat.error', { msg: m.error }) } : undefined}
                           actions={m.role === 'assistant' && m.content && !pending ? {
                             copy: { onClick: () => { copyText(m.content); }, tooltipContent: t('chat.copy'), clickedTooltipContent: t('chat.copied'), ariaLabel: t('chat.copy') },
-                            ...(i === lastBot && backend.state === 'ready' ? {
+                            ...(i === lastBot && serving ? {
                               regenerate: { onClick: regenerate, tooltipContent: t('chat.regenerate'), ariaLabel: t('chat.regenerate'), icon: <RedoIcon /> },
                             } : {}),
                           } : undefined}
@@ -653,8 +664,8 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                   hasAttachButton={false}
                   hasStopButton={generating}
                   handleStopButton={stop}
-                  isSendButtonDisabled={generating || backend.state !== 'ready'}
-                  placeholder={backend.state === 'ready' ? t('chat.placeholder') : t('chat.placeholderWait')}
+                  isSendButtonDisabled={generating || !serving}
+                  placeholder={serving ? t('chat.placeholder') : t('chat.placeholderWait')}
                   buttonProps={{ send: { tooltipContent: t('chat.send') }, stop: { tooltipContent: t('chat.stop') } }}
                 />
                 <ChatbotFootnote label={footLabel} popover={{ title: t('footnote.title'), description: footDetail, showClose: true }} />

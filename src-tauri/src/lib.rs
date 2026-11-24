@@ -119,10 +119,20 @@ async fn chat(app: AppHandle, body: String, on_event: Channel<ChatEvent>) -> Res
         .backend
         .port()
         .ok_or_else(|| "charsiu serve is not ready".to_string())?;
+    let b = app.state::<App>().backend.clone();
     blocking(move || {
-        http::chat(port, &body, &|e| {
+        let answered = std::sync::atomic::AtomicBool::new(false);
+        let r = http::chat(port, &body, &|e| {
+            if matches!(e, ChatEvent::Token { .. }) {
+                answered.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             let _ = on_event.send(e);
-        })
+        });
+        // a reply came back, so the server is ready, whatever its stderr said
+        if answered.load(std::sync::atomic::Ordering::Relaxed) {
+            b.answered(&app);
+        }
+        r
     })
     .await
 }

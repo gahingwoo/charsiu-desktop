@@ -74,7 +74,19 @@ impl Backend {
 
     pub fn port(&self) -> Option<u16> {
         let g = self.0.lock().unwrap();
-        (g.snap.state == "ready").then_some(g.snap.port).flatten()
+        // a server that has said its port answers, whatever a late staging
+        // heartbeat says; only a stopped or failed one does not
+        let live = g.snap.state != "failed" && g.snap.state != "stopped";
+        live.then_some(g.snap.port).flatten()
+    }
+
+    /// A reply came back: the server is ready, whatever the stderr said.
+    pub fn answered(&self, app: &AppHandle) {
+        let mut g = self.0.lock().unwrap();
+        if g.snap.port.is_some() && g.snap.state != "ready" && g.snap.state != "failed" {
+            g.snap.state = "ready".into();
+            Self::emit(app, &g.snap);
+        }
     }
 
     fn emit(app: &AppHandle, s: &Snapshot) {
@@ -188,43 +200,10 @@ impl Backend {
         }
         push_log(&mut g.log, l.to_string());
         let Some(ev) = classify(l) else { return };
-        let s = &mut g.snap;
-        match ev {
-            Line::Ready { port, .. } => {
-                s.state = "ready".into();
-                s.port = Some(port);
-                if s.npu == "unknown" {
-                    // a server that staged nothing and said nothing ran on the CPU
-                    s.npu = if s.total.is_some() || s.devices.is_some() {
-                        "on"
-                    } else {
-                        "off"
-                    }
-                    .into();
-                }
-                let me = self.clone();
-                let app = app.clone();
-                std::thread::spawn(move || me.health(port, gen, &app));
-            }
-            Line::Staging { total } => {
-                s.state = "loading".into();
-                s.total = Some(total);
-                s.staged = Some(0);
-            }
-            Line::Staged { done } => {
-                s.state = "loading".into();
-                s.staged = Some(done);
-            }
-            Line::NpuOn { devices } => {
-                s.npu = "on".into();
-                s.devices = Some(devices);
-            }
-            Line::NpuOff => s.npu = "off".into(),
-            Line::AdminNeeded => s.npu_problem = Some("admin".into()),
-            Line::DriverMissing => s.npu_problem = Some("driver".into()),
-            Line::NoModel => s.problem = Some("no_model".into()),
-            Line::ModelMissing => s.problem = Some("model_missing".into()),
-            Line::NotBuilt => s.problem = Some("not_built".into()),
+        if let Some(port) = apply(&mut g.snap, ev) {
+            let me = self.clone();
+            let app = app.clone();
+            std::thread::spawn(move || me.health(port, gen, &app));
         }
         Self::emit(app, &g.snap);
     }
@@ -239,6 +218,11 @@ impl Backend {
         }
         g.snap.served = v["model"].as_str().map(str::to_string);
         g.snap.context = v["context"].as_u64();
+        // the server answers: it is ready, whatever the stderr said last
+        if g.snap.state == "starting" || g.snap.state == "loading" {
+            g.snap.state = "ready".into();
+            g.snap.port = Some(port);
+        }
         Self::emit(app, &g.snap);
     }
 
@@ -286,4 +270,125 @@ fn push_log(log: &mut VecDeque<String>, l: String) {
         log.pop_front();
     }
     log.push_back(l);
+}
+
+/// What one stderr line does to the state. Returns the port when the server
+/// has just said it is listening, so the caller can ask it for /health.
+///
+/// READY IS FINAL FOR A RUNNING SERVER. charsiu stages the NPU tensors with a
+/// heartbeat every sixteenth, so the last heartbeat for 113 tensors is 112 and
+/// nothing closes it; and an older charsiu_serve staged on the first request,
+/// after "ready". Either way a staging line after the ready line only moves
+/// the counters: it must never take the state back to loading, which disabled
+/// Send after the first reply on the board (0.1.0).
+pub fn apply(s: &mut Snapshot, ev: Line) -> Option<u16> {
+    let ready = s.state == "ready";
+    match ev {
+        Line::Ready { port, .. } => {
+            s.state = "ready".into();
+            s.port = Some(port);
+            if let Some(t) = s.total {
+                s.staged = Some(t);
+            }
+            if s.npu == "unknown" {
+                // a server that staged nothing and said nothing ran on the CPU
+                s.npu = if s.total.is_some() || s.devices.is_some() {
+                    "on"
+                } else {
+                    "off"
+                }
+                .into();
+            }
+            return Some(port);
+        }
+        Line::Staging { total } => {
+            if !ready {
+                s.state = "loading".into();
+            }
+            s.total = Some(total);
+            s.staged = Some(0);
+        }
+        Line::Staged { done } => {
+            if !ready {
+                s.state = "loading".into();
+            }
+            s.staged = Some(done);
+        }
+        Line::NpuOn { devices } => {
+            s.npu = "on".into();
+            s.devices = Some(devices);
+        }
+        Line::NpuOff => s.npu = "off".into(),
+        Line::AdminNeeded => s.npu_problem = Some("admin".into()),
+        Line::DriverMissing => s.npu_problem = Some("driver".into()),
+        Line::NoModel => s.problem = Some("no_model".into()),
+        Line::ModelMissing => s.problem = Some("model_missing".into()),
+        Line::NotBuilt => s.problem = Some("not_built".into()),
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn feed(s: &mut Snapshot, lines: &[&str]) {
+        for l in lines {
+            if let Some(ev) = classify(l) {
+                apply(s, ev);
+            }
+        }
+    }
+
+    fn starting() -> Snapshot {
+        Snapshot {
+            state: "starting".into(),
+            npu: "unknown".into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn last_heartbeat_then_ready_is_ready() {
+        let mut s = starting();
+        feed(
+            &mut s,
+            &[
+                "charsiu NPU: staging 113",
+                "charsiu NPU: 112 tensors staged",
+                "charsiu_serve: ready on http://127.0.0.1:51234  (model m.gguf, ctx 2048)",
+            ],
+        );
+        assert_eq!(s.state, "ready");
+        assert_eq!(s.port, Some(51234));
+        assert_eq!(s.staged, Some(113));
+    }
+
+    #[test]
+    fn staging_after_ready_stays_ready() {
+        let mut s = starting();
+        feed(
+            &mut s,
+            &[
+                "charsiu_serve: ready on http://127.0.0.1:40000  (model m.gguf, ctx 2048)",
+                "charsiu NPU: staging 113",
+                "charsiu NPU: 112 tensors staged",
+            ],
+        );
+        assert_eq!(s.state, "ready");
+        assert_eq!(s.port, Some(40000));
+        assert_eq!(s.staged, Some(112));
+    }
+
+    #[test]
+    fn staging_before_ready_is_loading() {
+        let mut s = starting();
+        feed(
+            &mut s,
+            &["charsiu NPU: staging 113", "charsiu NPU: 16 tensors staged"],
+        );
+        assert_eq!(s.state, "loading");
+        assert_eq!(s.staged, Some(16));
+        assert_eq!(s.total, Some(113));
+    }
 }

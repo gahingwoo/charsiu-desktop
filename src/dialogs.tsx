@@ -94,7 +94,7 @@ export function AboutModal({ open, info, onReport, onClose }: { open: boolean; i
     <a href={href} onClick={(e) => { e.preventDefault(); openUrl(href); }}>{text}</a>
   );
   const rows: Array<[string, React.ReactNode]> = [
-    [t('about.version'), t('about.version.value', { version: info.version || '0.1.0', commit: BUILD.commit, date: BUILD.date })],
+    [t('about.version'), t('about.version.value', { version: info.version || '0.1.1', commit: BUILD.commit, date: BUILD.date })],
     [t('about.design'), `PatternFly ${BUILD.patternfly}, PatternFly Chatbot ${BUILD.chatbot}`],
     [t('about.runtime'), t('about.runtime.value')],
     [t('about.charsiu'), <span className="selectable">{info.charsiu || '-'}</span>],
@@ -199,7 +199,7 @@ export function SettingsModal({ settings, info, onSave, onAbout, onClose }: {
           </FormSection>
           <FormSection title={t('settings.version')} titleElement="h3">
             <FormGroup fieldId="about-open">
-              <Content component="p">{`${info.version || '0.1.0'} (${BUILD.commit})`}</Content>
+              <Content component="p">{`${info.version || '0.1.1'} (${BUILD.commit})`}</Content>
               <Button id="about-open" variant="link" isInline onClick={onAbout}>{t('about.open')}</Button>
             </FormGroup>
           </FormSection>
@@ -239,7 +239,7 @@ export function LogModal({ info, backend, npuLine, model, onClose }: {
   const who = { home: info.home || '', user: info.user || '' };
   const log = lines ?? [];
   const facts = {
-    version: info.version || '0.1.0', commit: BUILD.commit, os: info.os || 'unknown',
+    version: info.version || '0.1.1', commit: BUILD.commit, os: info.os || 'unknown',
     backend: `${backend.state}${backend.problem ? ` (${backend.problem})` : ''}`, npu: npuLine, model: model || '-', what, log,
   };
   const actions = (
