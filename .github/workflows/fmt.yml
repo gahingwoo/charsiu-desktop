@@ -1,0 +1,32 @@
+name: Apply rustfmt
+
+# Run by hand (Actions, "Apply rustfmt", Run workflow): formats src-tauri
+# with the stable rustfmt the Build workflow checks against and commits the
+# result to the branch it ran on, if anything changed.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fmt:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt
+      - name: Commit
+        run: |
+          set -eu
+          if git diff --quiet; then echo "already formatted"; exit 0; fi
+          git diff --stat
+          git config user.name gahingwoo
+          git config user.email gahing@gahingwoo.com
+          git commit -q -a -s -m "src-tauri: cargo fmt" -m "Applied by the Apply rustfmt workflow."
+          git push
