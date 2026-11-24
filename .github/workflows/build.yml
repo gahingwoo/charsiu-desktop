@@ -1,8 +1,9 @@
 name: Build
 
-# Every push: lint and tests, the Windows arm64 installer (NSIS) and the
-# Linux arm64 .deb (and an AppImage, best effort). A tag vX.Y.Z also attaches
-# them to that release.
+# Every push: the page (typecheck, build, its size), lint and tests,
+# screenshots of the page against a stand-in for the app, the Windows arm64
+# installer (NSIS) and the Linux arm64 .deb (and an AppImage, best effort).
+# A tag vX.Y.Z also attaches them to that release.
 
 on:
   push:
@@ -35,16 +36,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: UI scripts parse
-        run: for f in ui/*.js; do node --check "$f"; done
+          cache: npm
+      - name: The page (npm ci checks every package against package-lock.json)
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run typecheck
+          npm run build
       - name: No dashes in text
         run: |
-          if git grep -nP '\x{2013}|\x{2014}' -- . ':!ui/vendor'; then exit 1; fi
+          if git grep -nP '\x{2013}|\x{2014}' -- . ':!package-lock.json'; then exit 1; fi
       - name: cargo fmt
         working-directory: src-tauri
-        # the code was written without a local rustfmt; this reports the
-        # difference without failing the build until it has been applied once
-        continue-on-error: true
+        # the Apply rustfmt workflow (fmt.yml) fixes a failure here
         run: cargo fmt --check
       - name: cargo clippy
         working-directory: src-tauri
@@ -52,6 +55,27 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test
+
+  screenshots:
+    name: Screenshots of the page (Chrome, a stand-in for the app)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build and shoot
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          CHROME=$(command -v google-chrome || command -v chromium) npm run shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: shots/*.png
+          if-no-files-found: error
 
   windows:
     name: Windows arm64 installer (NSIS)
@@ -66,6 +90,14 @@ jobs:
         with:
           workspaces: src-tauri
           key: windows-arm64
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: The page
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
       - name: tauri-cli
         run: cargo install tauri-cli --version "=${{ env.TAURI_CLI_VERSION }}" --locked
       - name: Build
@@ -103,6 +135,14 @@ jobs:
         with:
           workspaces: src-tauri
           key: linux-arm64
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: The page
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
       - name: tauri-cli
         run: cargo install tauri-cli --version "=${{ env.TAURI_CLI_VERSION }}" --locked
       - name: Build the .deb

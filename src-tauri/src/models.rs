@@ -96,6 +96,24 @@ pub fn list(charsiu: &str) -> Result<Models, String> {
     if let Some(s) = &z.sysdir {
         scan(Path::new(s), true, &mut installed);
     }
+    // the model the config names may live anywhere (R:\npu\model.gguf on the
+    // board): list it too, so the picker can show what charsiu will run
+    if let Some(cur) = &z.current {
+        let p = Path::new(cur);
+        if let Ok(md) = std::fs::metadata(p) {
+            if md.is_file() && !installed.iter().any(|i| Path::new(&i.path) == p) {
+                installed.push(Installed {
+                    file: p
+                        .file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_else(|| cur.clone()),
+                    path: cur.clone(),
+                    bytes: md.len(),
+                    system: true,
+                });
+            }
+        }
+    }
     installed.sort_by(|a, b| a.file.to_lowercase().cmp(&b.file.to_lowercase()));
     let zoo = z
         .rows

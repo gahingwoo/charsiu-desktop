@@ -36,6 +36,10 @@ struct Info {
     version: String,
     /// the front door the app would use with no override, or empty
     charsiu: String,
+    /// the home folder and the user name, which "Report a problem" removes
+    /// from the log before anything leaves the computer
+    home: String,
+    user: String,
 }
 
 #[tauri::command]
@@ -46,7 +50,38 @@ fn app_info(app: AppHandle) -> Info {
         charsiu: proc::charsiu_path("")
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default(),
+        home: std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_default(),
+        user: std::env::var("USERNAME")
+            .or_else(|_| std::env::var("USER"))
+            .unwrap_or_default(),
     }
+}
+
+/// Open a link in the system's browser. Only https links to the places the
+/// app itself names (its issues page, its sources, the author's site).
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    const ALLOWED: [&str; 3] = [
+        "https://github.com/gahingwoo/",
+        "https://gahingwoo.com",
+        "https://www.patternfly.org/",
+    ];
+    if !ALLOWED.iter().any(|a| url.starts_with(a)) || url.contains(['"', '\'', '`', '\n']) {
+        return Err(format!("not a link the app opens: {url}"));
+    }
+    #[cfg(windows)]
+    let r = {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .creation_flags(0x0800_0000)
+            .spawn()
+    };
+    #[cfg(not(windows))]
+    let r = std::process::Command::new("xdg-open").arg(&url).spawn();
+    r.map(|_| ()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -166,6 +201,7 @@ pub fn run() {
             load_data,
             save_settings,
             save_conversations,
+            open_url,
         ])
         .build(tauri::generate_context!())
         .expect("charsiu desktop failed to start")

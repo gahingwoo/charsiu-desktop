@@ -1,1 +1,0 @@
-PatternFly 6.7.0 is MIT licensed: https://github.com/patternfly/patternfly

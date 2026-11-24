@@ -1,0 +1,126 @@
+/* Page CSS on top of PatternFly and the PatternFly Chatbot. The shell rules
+   (one scroll container, what is selectable, the masthead mark, focus, the
+   About box and the blurred backdrop) are Maskrom Studio's src/renderer/app.css
+   (same author and licence); the rest is this app's.
+   SPDX-License-Identifier: GPL-2.0-only */
+/* One scroll container per view: the wizard's main column in the wizard,
+   PatternFly's page main elsewhere (the run view), the modal body in a
+   dialog. The document itself never scrolls, so a wheel anywhere over the
+   content reaches the element that can move. */
+html, body, #root { height: 100%; overflow: hidden; }
+.pf-v6-c-page { height: 100%; }
+
+/* A desktop app, not a web page: the chrome and static text are not
+   selectable by a stray drag or a double click, and Ctrl+A in it selects
+   nothing. What people copy stays selectable: fields, code and logs, file
+   paths and details, error messages, the About values. */
+body { user-select: none; -webkit-user-select: none; }
+input, textarea, [contenteditable="true"],
+.pf-v6-c-code-block, .pf-v6-c-code-block *, .detail, .mono, .selectable,
+.pf-v6-c-alert__title, .pf-v6-c-alert__description,
+.pf-v6-c-helper-text__item.pf-m-error,
+.about-backdrop .pf-v6-c-description-list__description,
+.pf-v6-c-description-list__description {
+  user-select: text; -webkit-user-select: text;
+}
+
+/* Masthead: the mark at its own size beside the name (PatternFly sizes the
+   logo slot for a wide wordmark). */
+.pf-v6-c-masthead__logo { --pf-v6-c-masthead__logo--Width: auto; }
+.brand { display: flex; align-items: center; gap: var(--pf-t--global--spacer--sm); text-decoration: none; }
+.brand-mark { height: 1.75rem; width: auto; }
+/* The masthead column is min-content wide: keep the name on one line. */
+.brand-name { font-size: var(--pf-t--global--font--size--lg); color: var(--pf-t--global--text--color--regular); white-space: nowrap; }
+
+:focus-visible { outline-color: var(--pf-t--global--focus-ring--color--default); }
+/* A text field shows focus once, with its own border (PatternFly's hover
+   border, in the focus colour), not with the inset browser outline on top. */
+.pf-v6-c-form-control > :is(input, textarea):focus-visible { outline: none; }
+.pf-v6-c-form-control:focus-within {
+  --pf-v6-c-form-control--after--BorderWidth: var(--pf-t--global--border--width--control--hover);
+  --pf-v6-c-form-control--after--BorderColor: var(--pf-t--global--focus-ring--color--default);
+}
+
+/* About Charsiu Desktop: PatternFly's about modal box, as gahingwoo.com's
+   "About this site" lays it out (its site.css, adapted). */
+.about-backdrop .pf-v6-c-about-modal-box {
+  /* Sized to its rows, as gahingwoo.com's About this site: about 44rem wide,
+     as tall as the content, no artwork behind the text, the PatternFly
+     product layout's large paddings and right-hand column taken out. */
+  --pf-v6-c-about-modal-box--BackgroundImage: none;
+  --pf-v6-c-about-modal-box--Height: auto;
+  --pf-v6-c-about-modal-box--lg--Height: auto;
+  --pf-v6-c-about-modal-box--sm--GridTemplateColumns: 1fr auto;
+  --pf-v6-c-about-modal-box--lg--GridTemplateColumns: 1fr auto;
+  --pf-v6-c-about-modal-box__brand--PaddingBlockStart: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__brand--sm--PaddingBlockEnd: var(--pf-t--global--spacer--md);
+  --pf-v6-c-about-modal-box__brand--sm--PaddingInlineStart: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__brand--sm--PaddingInlineEnd: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__close--PaddingBlockStart: var(--pf-t--global--spacer--lg);
+  --pf-v6-c-about-modal-box__close--lg--PaddingInlineEnd: var(--pf-t--global--spacer--lg);
+  --pf-v6-c-about-modal-box__close--sm--PaddingBlockEnd: var(--pf-t--global--spacer--md);
+  --pf-v6-c-about-modal-box__header--sm--PaddingInlineStart: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__header--sm--PaddingInlineEnd: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__content--sm--MarginBlockStart: var(--pf-t--global--spacer--md);
+  --pf-v6-c-about-modal-box__header--PaddingBlockEnd: 0;
+  --pf-v6-c-about-modal-box__content--sm--MarginInlineStart: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__content--sm--MarginInlineEnd: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__content--sm--MarginBlockEnd: var(--pf-t--global--spacer--xl);
+  --pf-v6-c-about-modal-box__strapline--sm--PaddingBlockStart: var(--pf-t--global--spacer--lg);
+  border-radius: var(--pf-t--global--border--radius--large);
+  width: min(44rem, calc(100vw - 2 * var(--pf-t--global--spacer--lg)));
+  max-height: calc(100dvh - 2 * var(--pf-t--global--spacer--lg));
+  overflow: auto;
+}
+.about-backdrop .pf-v6-c-description-list {
+  --pf-v6-c-description-list--m-horizontal__term--width: 9rem;
+  --pf-v6-c-description-list--RowGap: var(--pf-t--global--spacer--sm);
+}
+.about-backdrop .pf-v6-c-description-list__description a { overflow-wrap: anywhere; }
+/* Every dialog's backdrop (PatternFly's, the About box's) covers the whole
+   window, masthead included, and blurs what is behind it. */
+.pf-v6-c-backdrop { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+@media (prefers-reduced-transparency: reduce) {
+  .pf-v6-c-backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+.credit-badge { display: block; width: 9rem; height: auto; }
+.credit-badge__mark { fill: #9472db; }
+.credit-badge__label, .credit-badge__name { font-family: var(--pf-t--global--font--family--mono); }
+.credit-badge__label { font-size: 20px; font-weight: 500; letter-spacing: 0.5px; fill: var(--pf-t--global--text--color--subtle); }
+.credit-badge__name { font-size: 38px; font-weight: 800; letter-spacing: -0.5px; fill: var(--pf-t--global--text--color--regular); }
+html.pf-v6-theme-dark .credit-badge__mark { fill: #8b73c9; }
+html.pf-v6-theme-dark .credit-badge__name { fill: var(--pf-t--global--text--color--subtle); }
+html.pf-v6-theme-dark .credit-badge__label { fill: var(--pf-t--global--text--color--subtle); opacity: 0.7; }
+
+
+
+/* Chat text, code and the status are what people copy. */
+.pf-chatbot__message-text, .pf-chatbot__message-text *, .pf-chatbot__message-and-actions,
+.msg-stats, .status-popover, .mono { user-select: text; -webkit-user-select: text; }
+.mono { font-family: var(--pf-t--global--font--family--mono); font-size: var(--pf-t--global--font--size--sm); word-break: break-all; }
+
+/* Regular-weight headings, the house style. */
+.regular, .pf-chatbot__hello { font-weight: var(--pf-t--global--font--weight--body--default); }
+
+/* The conversation's name in the chatbot header: one line. */
+.conv-title {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--pf-t--global--font--size--lg);
+  color: var(--pf-t--global--text--color--regular);
+}
+
+/* Problems, above the conversation, in the message box's measure. */
+.notices { display: grid; gap: var(--pf-t--global--spacer--md); margin-block-end: var(--pf-t--global--spacer--lg); }
+.notices .pf-v6-c-code-block { margin-block-start: var(--pf-t--global--spacer--sm); }
+.loading { max-width: 32rem; padding-inline: var(--pf-t--global--spacer--lg); }
+
+/* A reply's speed, under it. */
+.msg-stats { color: var(--pf-t--global--text--color--subtle); font-size: var(--pf-t--global--font--size--sm); margin-block-start: var(--pf-t--global--spacer--xs); }
+
+/* The status popover keeps its lines. */
+.status-popover .pf-v6-c-popover__body { white-space: pre-line; }
+
+/* The models tables. */
+@media (min-width: 48rem) { .nowrap { white-space: nowrap; } .models-action { min-width: 12rem; } }
+.models-note { color: var(--pf-t--global--text--color--subtle); }
+.log .pf-v6-c-code-block__code { max-height: 18rem; overflow: auto; display: block; white-space: pre-wrap; }

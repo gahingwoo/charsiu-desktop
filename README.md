@@ -38,15 +38,29 @@ The app is a front end and nothing more. It does not contain a model runtime.
 
 Tauri 2 with the system web view (WebView2 on Windows 11, WebKitGTK on
 Linux), because the board has 4 GB of memory and charsiu needs most of it.
-The page is plain HTML, CSS and JavaScript with no build step, styled with
-PatternFly 6 (`ui/vendor`, built by `tools/patternfly/build.sh`). English and
-Simplified Chinese.
+
+The page is React and the [PatternFly Chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview)
+extension, laid out as its "Embedded chatbot" demo: the conversation history
+drawer (new chat, search, rename, delete), the chatbot header with the model
+selector and the options menu, the message box (markdown, code blocks with
+copy, the typing indicator while a reply is read, copy and regenerate on a
+reply), the welcome prompt, the message bar (send, and stop while charsiu
+answers) and the footnote, which carries the status in words (backend, NPU,
+tokens/s, first token) with the details in its popover. Around it, the
+pieces shared with Maskrom Studio: the masthead, the language dialog, the
+About box on a blurred backdrop, settings as form sections, "Report a
+problem" with the log scrubbed of personal details, the theme (dark follows
+the system), and the rules for what is selectable. English and Simplified
+Chinese (`src/messages.ts`).
 
 ## Build
 
-Rust (stable) and the Tauri CLI:
+Node 22 and npm for the page, Rust (stable) and the Tauri CLI for the app:
 
 ```
+npm ci                 # every package checked against package-lock.json
+npm run typecheck
+npm run build          # esbuild, into dist/ (Tauri embeds it)
 cargo install tauri-cli --version =2.12.6 --locked
 cd src-tauri
 cargo tauri build --bundles deb                                    # Linux arm64
@@ -57,12 +71,17 @@ Linux needs `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
 libsoup-3.0-dev`. Windows needs Visual Studio's ARM64 build tools. MSI is not
 offered: WiX does not build arm64 installers. The product is called Charsiu
 Desktop so its Debian package (`charsiu-desktop`) does not collide with the
-`charsiu` package it runs. CI (`.github/workflows/build.yml`)
-builds both and runs the tests (`cargo test`: the stderr classifier, the zoo
-parser, SSE framing, a streamed reply against a stand-in server).
+`charsiu` package it runs.
 
-`python3 tools/make-icons.py` redraws the icons; `sh tools/patternfly/build.sh`
-rebuilds the PatternFly CSS.
+CI (`.github/workflows/build.yml`) builds the page, both packages and runs the
+tests (`cargo test`: the stderr classifier, the zoo parser, SSE framing, a
+streamed reply against a stand-in server). Its `screenshots` job renders the
+built page in Chrome against `scripts/mock-tauri.js`, a stand-in for the app's
+commands (`npm run shots` locally, with `CHROME=` pointing at a Chrome).
+`cargo fmt --check` is part of the lint job; the "Apply rustfmt" workflow
+(`fmt.yml`, run by hand) formats and commits.
+
+`python3 tools/make-icons.py` redraws the icons.
 
 ## Testing on the board
 
@@ -77,21 +96,30 @@ Windows (TaishanPi 3M, Windows 11 23H2 arm64):
 2. Run the installer `Charsiu Desktop_0.1.0_arm64-setup.exe` from the
    `charsiu-desktop-windows-arm64` artifact. It installs for the current user;
    WebView2 is already part of Windows 11.
-3. Start Charsiu Desktop from the Start menu. Expected: Backend "loading the model",
-   then "ready (127.0.0.1:PORT)"; NPU "in use, 2 cores, driver started" and
+3. Start Charsiu Desktop from the Start menu. Expected, in the footnote under
+   the message bar: "loading the model", then "ready · NPU in use, 2 cores";
+   its popover has the port, the model and "driver started" with
    the per-core busy figures while a reply is written (if the counters are
    registered, see woa-rk3576-npu docs/PERFCOUNTERS.md). The first start of a
    model takes about a minute (quantising, writing the weight cache); later
    starts a few seconds.
-4. Ask something; check the reply streams, Stop ends it within a token or
-   two, Copy works, the status line shows tokens/s (M7 measured 14 to 16 on
-   Llama 3.2 1B) and the first-token time.
-5. Models: download smollm2-135m-q4 (92 MB), watch the progress, Use it, and
+4. Ask something (or click a welcome prompt); check the typing indicator,
+   then the reply streams, Stop ends it within a token or two, Copy and
+   Regenerate work, a code block has its own copy button, and the footnote
+   shows tokens/s (M7 measured 14 to 16 on Llama 3.2 1B) and the first-token
+   time. If config.ini names a model outside the models folder (for example
+   R:\npu\Llama-3.2-1B-Instruct-Q8_0.gguf), the model selector lists it as
+   the config's model.
+5. Conversations: open the drawer, start a new chat, search, rename and
+   delete one; restart the app and check they are still there.
+6. Models: download smollm2-135m-q4 (92 MB), watch the progress, Use it, and
    check the backend restarts with it. Remove it again.
-6. As a user without access to the NPU device (rknpu.sys admits
+7. As a user without access to the NPU device (rknpu.sys admits
    administrators only unless the installer set it otherwise), expect the
    warning "The NPU needs administrator rights" and replies on the CPU.
-7. Close the app and check in Task Manager that no charsiu_serve.exe or
+8. Options, Report a problem: the log shows with the user folder replaced by
+   ~, and the button opens a GitHub issue in the browser.
+9. Close the app and check in Task Manager that no charsiu_serve.exe or
    powershell.exe is left.
 
 Linux (Armbian edge with rocket, or any arm64 Debian/Ubuntu with charsiu):
@@ -100,10 +128,10 @@ Linux (Armbian edge with rocket, or any arm64 Debian/Ubuntu with charsiu):
    `charsiu "hello"`.
 2. `sudo apt install ./charsiu-desktop_0.1.0_arm64.deb` from the
    `charsiu-desktop-linux-arm64-deb` artifact.
-3. Start Charsiu Desktop from the menu and repeat steps 3 to 5 above. NPU shows
+3. Start Charsiu Desktop from the menu and repeat steps 3 to 6 above. NPU shows
    "rocket driver loaded, 2 of 2 cores active" while it answers.
 4. Close it and check `pgrep -a charsiu_serve` prints nothing.
 
 ## Licence
 
-GPL-2.0-only. PatternFly (ui/vendor) is MIT.
+GPL-2.0-only. PatternFly and the PatternFly Chatbot are MIT, bundled into dist/ at build time (esbuild writes their licence comments to dist/app.js.LEGAL.txt).

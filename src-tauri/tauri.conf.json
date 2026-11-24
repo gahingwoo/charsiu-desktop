@@ -5,14 +5,14 @@
   "version": "0.1.0",
   "identifier": "com.gahingwoo.charsiu-desktop",
   "build": {
-    "frontendDist": "../ui"
+    "frontendDist": "../dist"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
-        "title": "charsiu",
+        "title": "Charsiu Desktop",
         "width": 1100,
         "height": 760,
         "minWidth": 640,
@@ -25,7 +25,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "deb", "appimage"],
+    "targets": [
+      "nsis",
+      "deb",
+      "appimage"
+    ],
     "category": "Utility",
     "shortDescription": "Chat with a model on the RK3576 NPU",
     "longDescription": "A desktop chat window for charsiu. It starts charsiu serve on 127.0.0.1 and talks to it over charsiu's OpenAI compatible endpoint, on Windows on Arm (rknpu.sys) and on Linux (the rocket driver).",
@@ -39,10 +43,16 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English", "SimpChinese"],
+        "languages": [
+          "English",
+          "SimpChinese"
+        ],
         "displayLanguageSelector": false
       }
     },
