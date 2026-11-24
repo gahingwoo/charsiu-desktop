@@ -198,7 +198,12 @@ mod win {
     #[link(name = "pdh")]
     extern "system" {
         fn PdhOpenQueryW(source: *const u16, user: usize, query: *mut PdhHandle) -> u32;
-        fn PdhAddEnglishCounterW(query: PdhHandle, path: *const u16, user: usize, counter: *mut PdhHandle) -> u32;
+        fn PdhAddEnglishCounterW(
+            query: PdhHandle,
+            path: *const u16,
+            user: usize,
+            counter: *mut PdhHandle,
+        ) -> u32;
         fn PdhCollectQueryData(query: PdhHandle) -> u32;
         fn PdhGetFormattedCounterArrayW(
             counter: PdhHandle,
@@ -207,7 +212,12 @@ mod win {
             count: *mut u32,
             items: *mut c_void,
         ) -> u32;
-        fn PdhGetFormattedCounterValue(counter: PdhHandle, format: u32, kind: *mut u32, value: *mut FmtValue) -> u32;
+        fn PdhGetFormattedCounterValue(
+            counter: PdhHandle,
+            format: u32,
+            kind: *mut u32,
+            value: *mut FmtValue,
+        ) -> u32;
         fn PdhCloseQuery(query: PdhHandle) -> u32;
     }
 
@@ -250,7 +260,12 @@ mod win {
             match (busy, jobs, bytes) {
                 (Some(busy), Some(jobs), Some(bytes)) => {
                     PdhCollectQueryData(q);
-                    Some(Query { q, busy, jobs, bytes })
+                    Some(Query {
+                        q,
+                        busy,
+                        jobs,
+                        bytes,
+                    })
                 }
                 _ => {
                     PdhCloseQuery(q);
@@ -266,7 +281,13 @@ mod win {
         unsafe {
             let mut size = 0u32;
             let mut count = 0u32;
-            let r = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &mut size, &mut count, std::ptr::null_mut());
+            let r = PdhGetFormattedCounterArrayW(
+                counter,
+                PDH_FMT_DOUBLE,
+                &mut size,
+                &mut count,
+                std::ptr::null_mut(),
+            );
             if r != PDH_MORE_DATA || size == 0 {
                 return out;
             }
@@ -319,12 +340,16 @@ mod win {
                 state: None,
             })
             .collect();
-        let mut v = FmtValue { cstatus: 0, value: 0.0 };
+        let mut v = FmtValue {
+            cstatus: 0,
+            value: 0.0,
+        };
         let mut kind = 0u32;
         // SAFETY: valid out pointers
-        let bytes = (unsafe { PdhGetFormattedCounterValue(q.bytes, PDH_FMT_DOUBLE, &mut kind, &mut v) }
-            == ERROR_SUCCESS)
-            .then_some(v.value);
+        let bytes =
+            (unsafe { PdhGetFormattedCounterValue(q.bytes, PDH_FMT_DOUBLE, &mut kind, &mut v) }
+                == ERROR_SUCCESS)
+                .then_some(v.value);
         Some((cores, bytes))
     }
 

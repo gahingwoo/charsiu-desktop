@@ -15,7 +15,9 @@ fn dir(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 pub fn read(app: &AppHandle, name: &str) -> serde_json::Value {
-    let Ok(d) = dir(app) else { return serde_json::Value::Null };
+    let Ok(d) = dir(app) else {
+        return serde_json::Value::Null;
+    };
     std::fs::read_to_string(d.join(name))
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())

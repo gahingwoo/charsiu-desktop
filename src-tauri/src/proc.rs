@@ -38,7 +38,12 @@ pub fn charsiu_path(override_path: &str) -> Result<PathBuf, String> {
 fn candidates() -> Vec<PathBuf> {
     let mut v = Vec::new();
     if let Some(l) = std::env::var_os("LOCALAPPDATA") {
-        v.push(Path::new(&l).join("Programs").join("charsiu").join("charsiu.ps1"));
+        v.push(
+            Path::new(&l)
+                .join("Programs")
+                .join("charsiu")
+                .join("charsiu.ps1"),
+        );
     }
     if let Some(path) = std::env::var_os("PATH") {
         for d in std::env::split_paths(&path) {
@@ -96,8 +101,14 @@ fn base(front: &Path) -> Command {
             .filter(|p| p.is_file())
             .unwrap_or_else(|| PathBuf::from("powershell.exe"));
         let mut c = Command::new(ps);
-        c.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
-            .arg(front);
+        c.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ])
+        .arg(front);
         c
     } else {
         Command::new(front)

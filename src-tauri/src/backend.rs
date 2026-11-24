@@ -117,7 +117,10 @@ impl Backend {
         if let Some(m) = &model {
             c.env("CHARSIU_MODEL", m);
         }
-        push_log(&mut g.log, format!("$ {} serve --host 127.0.0.1 --port 0", front.display()));
+        push_log(
+            &mut g.log,
+            format!("$ {} serve --host 127.0.0.1 --port 0", front.display()),
+        );
         let mut p = match Proc::spawn(c) {
             Ok(p) => p,
             Err(e) => {
@@ -192,7 +195,12 @@ impl Backend {
                 s.port = Some(port);
                 if s.npu == "unknown" {
                     // a server that staged nothing and said nothing ran on the CPU
-                    s.npu = if s.total.is_some() || s.devices.is_some() { "on" } else { "off" }.into();
+                    s.npu = if s.total.is_some() || s.devices.is_some() {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                    .into();
                 }
                 let me = self.clone();
                 let app = app.clone();
@@ -222,7 +230,9 @@ impl Backend {
     }
 
     fn health(&self, port: u16, gen: u64, app: &AppHandle) {
-        let Ok(v) = crate::http::get_json(port, "/health") else { return };
+        let Ok(v) = crate::http::get_json(port, "/health") else {
+            return;
+        };
         let mut g = self.0.lock().unwrap();
         if g.generation != gen {
             return;

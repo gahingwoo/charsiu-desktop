@@ -24,7 +24,9 @@ struct App {
 }
 
 async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> Result<T, String> {
-    tauri::async_runtime::spawn_blocking(f).await.map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Serialize)]
@@ -58,7 +60,11 @@ fn backend_log(st: State<App>) -> Vec<String> {
 }
 
 #[tauri::command]
-async fn backend_start(app: AppHandle, charsiu: String, model: Option<String>) -> Result<(), String> {
+async fn backend_start(
+    app: AppHandle,
+    charsiu: String,
+    model: Option<String>,
+) -> Result<(), String> {
     let b = app.state::<App>().backend.clone();
     let model = model.filter(|m| !m.is_empty());
     blocking(move || b.start(&app, &charsiu, model)).await

@@ -20,9 +20,15 @@ use std::time::Duration;
 pub enum ChatEvent {
     /// the request is sent; the prompt is being read
     Sent,
-    Token { text: String },
-    Done { finish: String },
-    Error { message: String },
+    Token {
+        text: String,
+    },
+    Done {
+        finish: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
 /// The socket of the request in flight, so cancel() can close it.
@@ -43,7 +49,13 @@ struct Response {
     rest: Vec<u8>,
 }
 
-fn request(port: u16, method: &str, path: &str, body: &str, track: bool) -> Result<Response, String> {
+fn request(
+    port: u16,
+    method: &str,
+    path: &str,
+    body: &str,
+    track: bool,
+) -> Result<Response, String> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let mut s = TcpStream::connect_timeout(&addr, Duration::from_secs(3))
         .map_err(|e| format!("cannot reach charsiu serve on port {port}: {e}"))?;
@@ -75,7 +87,9 @@ fn request(port: u16, method: &str, path: &str, body: &str, track: bool) -> Resu
         if buf.len() > 64 * 1024 {
             return Err("the reply's headers are too long".into());
         }
-        let n = s.read(&mut tmp).map_err(|e| format!("reading the reply failed: {e}"))?;
+        let n = s
+            .read(&mut tmp)
+            .map_err(|e| format!("reading the reply failed: {e}"))?;
         if n == 0 {
             return Err("charsiu serve closed the connection without a reply".into());
         }
@@ -93,7 +107,12 @@ fn request(port: u16, method: &str, path: &str, body: &str, track: bool) -> Resu
         let l = l.to_ascii_lowercase();
         l.starts_with("transfer-encoding:") && l.contains("chunked")
     });
-    Ok(Response { status, chunked, stream: s, rest })
+    Ok(Response {
+        status,
+        chunked,
+        stream: s,
+        rest,
+    })
 }
 
 fn find(h: &[u8], n: &[u8]) -> Option<usize> {
@@ -142,7 +161,9 @@ pub fn chat(port: u16, body: &str, emit: &dyn Fn(ChatEvent)) {
         Err(e) => {
             INFLIGHT.lock().unwrap().take();
             if CANCELLED.load(Ordering::SeqCst) {
-                return emit(ChatEvent::Done { finish: "cancelled".into() });
+                return emit(ChatEvent::Done {
+                    finish: "cancelled".into(),
+                });
             }
             return emit(ChatEvent::Error { message: e });
         }
@@ -151,7 +172,9 @@ pub fn chat(port: u16, body: &str, emit: &dyn Fn(ChatEvent)) {
         let status = r.status;
         INFLIGHT.lock().unwrap().take();
         let b = body_of(r).unwrap_or_default();
-        return emit(ChatEvent::Error { message: error_message(status, &b) });
+        return emit(ChatEvent::Error {
+            message: error_message(status, &b),
+        });
     }
     emit(ChatEvent::Sent);
 
@@ -175,13 +198,17 @@ pub fn chat(port: u16, body: &str, emit: &dyn Fn(ChatEvent)) {
                 continue;
             };
             if let Some(m) = v["error"]["message"].as_str() {
-                emit(ChatEvent::Error { message: m.to_string() });
+                emit(ChatEvent::Error {
+                    message: m.to_string(),
+                });
                 break 'read;
             }
             let c = &v["choices"][0];
             if let Some(t) = c["delta"]["content"].as_str() {
                 if !t.is_empty() {
-                    emit(ChatEvent::Token { text: t.to_string() });
+                    emit(ChatEvent::Token {
+                        text: t.to_string(),
+                    });
                 }
             }
             if let Some(f) = c["finish_reason"].as_str() {
@@ -213,7 +240,10 @@ mod tests {
     #[test]
     fn error_bodies() {
         assert_eq!(
-            error_message(400, "{\"error\":{\"message\":\"the conversation does not fit in 2048 tokens\"}}\n"),
+            error_message(
+                400,
+                "{\"error\":{\"message\":\"the conversation does not fit in 2048 tokens\"}}\n"
+            ),
             "the conversation does not fit in 2048 tokens"
         );
         assert_eq!(error_message(404, ""), "HTTP 404");

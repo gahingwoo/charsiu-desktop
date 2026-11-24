@@ -55,13 +55,19 @@ fn run(charsiu: &str, args: &[&str]) -> Result<String, String> {
     if !out.status.success() {
         let se = String::from_utf8_lossy(&out.stderr);
         let msg = se.trim();
-        return Err(if msg.is_empty() { so.trim().to_string() } else { msg.to_string() });
+        return Err(if msg.is_empty() {
+            so.trim().to_string()
+        } else {
+            msg.to_string()
+        });
     }
     Ok(so)
 }
 
 fn scan(dir: &Path, system: bool, out: &mut Vec<Installed>) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
     for e in rd.flatten() {
         let name = e.file_name().to_string_lossy().to_string();
         if !is_model_file(&name) {
@@ -106,7 +112,13 @@ pub fn list(charsiu: &str) -> Result<Models, String> {
             installed: installed.iter().any(|i| i.file == r.file),
         })
         .collect();
-    Ok(Models { dir: z.dir, sysdir: z.sysdir, current: z.current, zoo, installed })
+    Ok(Models {
+        dir: z.dir,
+        sysdir: z.sysdir,
+        current: z.current,
+        zoo,
+        installed,
+    })
 }
 
 pub fn remove(charsiu: &str, file: &str) -> Result<(), String> {
@@ -152,7 +164,10 @@ impl Default for Pull {
         Pull(Arc::new(Mutex::new(PullInner {
             proc: None,
             req: None,
-            status: PullStatus { state: "idle".into(), ..Default::default() },
+            status: PullStatus {
+                state: "idle".into(),
+                ..Default::default()
+            },
             log: VecDeque::new(),
         })))
     }
@@ -187,10 +202,18 @@ impl Pull {
         let mut p = Proc::spawn(proc::command(&front, &["pull", &req.name]))
             .map_err(|e| format!("{}: {e}", front.display()))?;
         g.log.clear();
-        for r in [p.child.stderr.take().map(|r| Box::new(r) as Box<dyn Read + Send>),
-                  p.child.stdout.take().map(|r| Box::new(r) as Box<dyn Read + Send>)]
-            .into_iter()
-            .flatten()
+        for r in [
+            p.child
+                .stderr
+                .take()
+                .map(|r| Box::new(r) as Box<dyn Read + Send>),
+            p.child
+                .stdout
+                .take()
+                .map(|r| Box::new(r) as Box<dyn Read + Send>),
+        ]
+        .into_iter()
+        .flatten()
         {
             let me = self.clone();
             std::thread::spawn(move || me.read(r));
@@ -217,7 +240,9 @@ impl Pull {
             buf.extend_from_slice(&tmp[..n]);
             while let Some(i) = buf.iter().position(|&b| b == b'\n' || b == b'\r') {
                 let l: Vec<u8> = buf.drain(..=i).collect();
-                let l = String::from_utf8_lossy(&l[..l.len() - 1]).trim().to_string();
+                let l = String::from_utf8_lossy(&l[..l.len() - 1])
+                    .trim()
+                    .to_string();
                 if !l.is_empty() {
                     let mut g = self.0.lock().unwrap();
                     if g.log.len() >= 40 {
@@ -252,7 +277,9 @@ impl Pull {
                         .log
                         .iter()
                         .rev()
-                        .find(|l| l.contains("ERROR") || l.contains("error") || l.contains("cannot"))
+                        .find(|l| {
+                            l.contains("ERROR") || l.contains("error") || l.contains("cannot")
+                        })
                         .or(g.log.back())
                         .cloned()
                         .unwrap_or_else(|| format!("charsiu pull exited with {st}"));

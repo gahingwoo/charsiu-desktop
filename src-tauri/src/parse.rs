@@ -177,7 +177,11 @@ pub fn parse_zoo(text: &str) -> Zoo {
                 if v.len() < 4 || v[0].is_empty() || v[2].is_empty() {
                     continue;
                 }
-                let num = |i: usize| v.get(i).and_then(|s| s.trim().parse::<u64>().ok()).unwrap_or(0);
+                let num = |i: usize| {
+                    v.get(i)
+                        .and_then(|s| s.trim().parse::<u64>().ok())
+                        .unwrap_or(0)
+                };
                 let s = |i: usize| v.get(i).map(|s| s.to_string()).unwrap_or_default();
                 z.rows.push(ZooRow {
                     name: s(0),
@@ -291,7 +295,10 @@ mod tests {
         let l = "charsiu_serve: ready on http://127.0.0.1:54321  (model Llama.gguf, ctx 2048)";
         assert_eq!(
             classify(l),
-            Some(Line::Ready { host: "127.0.0.1".into(), port: 54321 })
+            Some(Line::Ready {
+                host: "127.0.0.1".into(),
+                port: 54321
+            })
         );
         assert_eq!(parse_ready("ready on http://0.0.0.0:0  (x)"), None);
         assert_eq!(parse_ready("ready on http://host:80"), None);
@@ -303,7 +310,10 @@ mod tests {
             classify("charsiu NPU: weights are int4 w4a16, 2 devices"),
             Some(Line::NpuOn { devices: 2 })
         );
-        assert_eq!(classify("charsiu: no NPU; staying on the CPU"), Some(Line::NpuOff));
+        assert_eq!(
+            classify("charsiu: no NPU; staying on the CPU"),
+            Some(Line::NpuOff)
+        );
         assert_eq!(
             classify("charsiu: cannot open \\\\.\\RKNPU (Windows error 5): run as administrator"),
             Some(Line::AdminNeeded)
@@ -316,20 +326,38 @@ mod tests {
 
     #[test]
     fn staging_lines() {
-        assert_eq!(classify("charsiu NPU: staging 113"), Some(Line::Staging { total: 113 }));
-        assert_eq!(classify("charsiu NPU: 48 tensors staged"), Some(Line::Staged { done: 48 }));
-        assert_eq!(classify("charsiu: 113 of 113 tensors ON THE HARDWARE"), None);
+        assert_eq!(
+            classify("charsiu NPU: staging 113"),
+            Some(Line::Staging { total: 113 })
+        );
+        assert_eq!(
+            classify("charsiu NPU: 48 tensors staged"),
+            Some(Line::Staged { done: 48 })
+        );
+        assert_eq!(
+            classify("charsiu: 113 of 113 tensors ON THE HARDWARE"),
+            None
+        );
     }
 
     #[test]
     fn front_door_errors() {
-        assert_eq!(classify("charsiu serve: no model set. Try: charsiu setup"), Some(Line::NoModel));
+        assert_eq!(
+            classify("charsiu serve: no model set. Try: charsiu setup"),
+            Some(Line::NoModel)
+        );
         assert_eq!(
             classify("charsiu serve: C:\\m\\x.gguf does not exist (charsiu pull)"),
             Some(Line::ModelMissing)
         );
-        assert_eq!(classify("charsiu serve: charsiu_serve is not built"), Some(Line::NotBuilt));
-        assert_eq!(classify("charsiu: cannot find 'charsiu_serve'."), Some(Line::NotBuilt));
+        assert_eq!(
+            classify("charsiu serve: charsiu_serve is not built"),
+            Some(Line::NotBuilt)
+        );
+        assert_eq!(
+            classify("charsiu: cannot find 'charsiu_serve'."),
+            Some(Line::NotBuilt)
+        );
         assert_eq!(classify("  POST /v1/chat/completions  120 bytes"), None);
     }
 
@@ -349,7 +377,12 @@ mod tests {
         assert_eq!(z.current.as_deref(), Some("/x/y.gguf"));
         assert_eq!(z.rows.len(), 4);
         assert_eq!(z.rows[1].total_mb(), 279);
-        let chat: Vec<_> = z.rows.iter().filter(|r| r.is_chat()).map(|r| r.name.as_str()).collect();
+        let chat: Vec<_> = z
+            .rows
+            .iter()
+            .filter(|r| r.is_chat())
+            .map(|r| r.name.as_str())
+            .collect();
         assert_eq!(chat, vec!["smollm2-135m-q4", "smolvlm-256m"]);
     }
 
