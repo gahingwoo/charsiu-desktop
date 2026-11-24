@@ -1,18 +1,17 @@
-// Charsiu Desktop, the page: PatternFly's Chatbot in embedded display mode
-// under the masthead Maskrom Studio uses, laid out as the Chatbot
-// extension's "Embedded chatbot" demo. Everything that touches the system is
+// Charsiu Desktop, the page: PatternFly's Chatbot in fullscreen display mode,
+// the whole window, laid out as the Chatbot extension's own demo (header with
+// the history menu, the name, the model selector and the options; the message
+// box; the message bar and a footnote). Everything that touches the system is
 // a Rust command (src/api.ts); this keeps the conversations and draws.
 // SPDX-License-Identifier: GPL-2.0-only
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
-  Alert, AlertActionLink, Button, CodeBlock, CodeBlockCode, Content, Divider, DropdownGroup, DropdownItem, DropdownList,
-  Masthead, MastheadBrand, MastheadContent, MastheadLogo, MastheadMain, Page, Progress, ProgressSize, Spinner,
-  Toolbar, ToolbarContent, ToolbarGroup, ToolbarItem,
+  AlertActionLink, Brand, Bullseye, CodeBlock, CodeBlockCode, Content, Divider, DropdownGroup, DropdownItem, DropdownList,
+  Flex, Progress, ProgressMeasureLocation, ProgressSize,
 } from '@patternfly/react-core';
-import { CogIcon } from '@patternfly/react-icons/dist/esm/icons/cog-icon';
-import { GlobeIcon } from '@patternfly/react-icons/dist/esm/icons/globe-icon';
 import { RedoIcon } from '@patternfly/react-icons/dist/esm/icons/redo-icon';
 import Chatbot, { ChatbotDisplayMode } from '@patternfly/chatbot/dist/dynamic/Chatbot';
+import ChatbotAlert from '@patternfly/chatbot/dist/dynamic/ChatbotAlert';
 import ChatbotContent from '@patternfly/chatbot/dist/dynamic/ChatbotContent';
 import ChatbotWelcomePrompt from '@patternfly/chatbot/dist/dynamic/ChatbotWelcomePrompt';
 import ChatbotFooter, { ChatbotFootnote } from '@patternfly/chatbot/dist/dynamic/ChatbotFooter';
@@ -29,15 +28,17 @@ import {
   type ChatEvent, type Conv, type Info, type Models, type Msg, type NpuStatus, type PullStatus, type Settings, type Snapshot,
 } from './api';
 import { useI18n } from './i18n';
-import { LANG_NAMES } from './i18n-core';
 import type { T } from './i18n-core';
 import { applyTheme, followSystem } from './theme';
-import { AboutModal, ConfirmDelete, LangModal, LogModal, RenameModal, SettingsModal } from './dialogs';
+import { AboutModal, ConfirmDelete, LangModal, LogModal, RenameModal, SettingsModal, StatusModal } from './dialogs';
 import { ModelsModal } from './models';
 import botAvatar from '../src-tauri/icons/128x128.png';
 import userAvatar from './user-avatar.svg';
 
-const DISPLAY = ChatbotDisplayMode.embedded;
+const DISPLAY = ChatbotDisplayMode.fullscreen;
+
+/** A model file's name as people say it: no folder, no .gguf. */
+export const modelName = (p: string) => base(p).replace(/\.gguf$/i, '');
 
 // ---- words for the state ---------------------------------------------------------
 
@@ -109,7 +110,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   const setGenerating = (v: boolean) => { generatingRef.current = v; setGeneratingState(v); };
   const [drawer, setDrawer] = useState(false);
   const [search, setSearch] = useState('');
-  const [dialog, setDialog] = useState<'' | 'models' | 'settings' | 'lang' | 'about' | 'log'>('');
+  const [dialog, setDialog] = useState<'' | 'status' | 'models' | 'settings' | 'lang' | 'about' | 'log'>('');
   const [renaming, setRenaming] = useState<Conv | null>(null);
   const [deleting, setDeleting] = useState<Conv | null>(null);
   const [announcement, setAnnouncement] = useState('');
@@ -381,11 +382,13 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
 
   // ---- notices: each failure in words, with what to do about it
 
+  const loadingProgress = backend.state === 'loading' && backend.total
+    ? Math.min(100, Math.round((100 * (backend.staged || 0)) / backend.total)) : null;
   const win = info.os === 'windows';
   const notices: React.ReactNode[] = [];
   const code = (s: string) => <CodeBlock key={s}><CodeBlockCode>{s}</CodeBlockCode></CodeBlock>;
   if (loaded && !tauri()) {
-    notices.push(<Alert key="browser" isInline variant="danger" title={t('problem.browser')} />);
+    notices.push(<ChatbotAlert key="browser" variant="danger" title={t('problem.browser')} />);
   } else if (backend.state === 'failed') {
     const retry = <AlertActionLink key="retry" onClick={() => startBackend()}>{t('common.retry')}</AlertActionLink>;
     const log = <AlertActionLink key="log" onClick={() => setDialog('log')}>{t('common.showLog')}</AlertActionLink>;
@@ -393,54 +396,68 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     switch (backend.problem) {
       case 'not_installed':
         notices.push(
-          <Alert key="p" isInline variant="danger" title={t('problem.notInstalled')}
+          <ChatbotAlert key="p" variant="danger" title={t('problem.notInstalled')}
             actionLinks={[retry, <AlertActionLink key="set" onClick={() => setDialog('settings')}>{t('problem.setPath')}</AlertActionLink>]}>
             <p>{t(win ? 'problem.notInstalledWin' : 'problem.notInstalledLinux')}</p>
             {win ? code(INSTALL.windows) : <>{code(INSTALL.armbian)}{code(INSTALL.linux)}</>}
-          </Alert>,
+          </ChatbotAlert>,
         );
         break;
       case 'no_model':
-        notices.push(<Alert key="p" isInline variant="warning" title={t('problem.noModel')} actionLinks={[open, retry]}><p>{t('problem.noModelBody')}</p></Alert>);
+        notices.push(<ChatbotAlert key="p" variant="warning" title={t('problem.noModel')} actionLinks={[open, retry]}><p>{t('problem.noModelBody')}</p></ChatbotAlert>);
         break;
       case 'model_missing':
-        notices.push(<Alert key="p" isInline variant="warning" title={t('problem.modelMissing')} actionLinks={[open, retry]}><p>{t('problem.modelMissingBody')}</p></Alert>);
+        notices.push(<ChatbotAlert key="p" variant="warning" title={t('problem.modelMissing')} actionLinks={[open, retry]}><p>{t('problem.modelMissingBody')}</p></ChatbotAlert>);
         break;
       case 'not_built':
         notices.push(
-          <Alert key="p" isInline variant="danger" title={t('problem.notBuilt')} actionLinks={[retry, log]}>
+          <ChatbotAlert key="p" variant="danger" title={t('problem.notBuilt')} actionLinks={[retry, log]}>
             <p>{t('problem.notBuiltBody')}</p>{code(win ? INSTALL.windows : INSTALL.linux)}
-          </Alert>,
+          </ChatbotAlert>,
         );
         break;
       default:
         notices.push(
-          <Alert key="p" isInline variant="danger" title={t(backend.problem === 'spawn' ? 'problem.spawn' : 'problem.exited')} actionLinks={[retry, log]}>
-            {backend.detail && <p className="selectable mono">{backend.detail}</p>}
-          </Alert>,
+          <ChatbotAlert key="p" variant="danger" title={t(backend.problem === 'spawn' ? 'problem.spawn' : 'problem.exited')} actionLinks={[retry, log]}>
+            {backend.detail && code(backend.detail)}
+          </ChatbotAlert>,
         );
     }
   } else if (backend.state === 'ready' || backend.state === 'loading') {
     if (backend.npuProblem === 'admin') {
-      notices.push(<Alert key="n" isInline variant="warning" title={t('problem.adminNeeded')}><p>{t('problem.adminNeededBody')}</p>{code(INSTALL.windows)}</Alert>);
+      notices.push(<ChatbotAlert key="n" variant="warning" title={t('problem.adminNeeded')}><p>{t('problem.adminNeededBody')}</p>{code(INSTALL.windows)}</ChatbotAlert>);
     } else if (backend.npuProblem === 'driver' || (backend.npu === 'off' && win && backend.state === 'ready')) {
       notices.push(
-        <Alert key="n" isInline variant="warning" title={t('problem.driverWin')}
+        <ChatbotAlert key="n" variant="warning" title={t('problem.driverWin')}
           actionLinks={[<AlertActionLink key="log" onClick={() => setDialog('log')}>{t('common.showLog')}</AlertActionLink>]}>
           <p>{t('problem.driverWinBody')}</p>{code(INSTALL.windows)}
-        </Alert>,
+        </ChatbotAlert>,
       );
     } else if (backend.npu === 'off' && !win && backend.state === 'ready') {
       notices.push(
-        <Alert key="n" isInline variant="warning" title={t('problem.cpuLinux')}
+        <ChatbotAlert key="n" variant="warning" title={t('problem.cpuLinux')}
           actionLinks={[<AlertActionLink key="log" onClick={() => setDialog('log')}>{t('common.showLog')}</AlertActionLink>]}>
           <p>{t('problem.cpuLinuxBody')}</p>{code(INSTALL.linux)}
-        </Alert>,
+        </ChatbotAlert>,
       );
     }
   }
 
-  // ---- the footnote: the status, as words, with the details a click away
+  if (backend.state === 'starting' || backend.state === 'loading') {
+    if (!serving) {
+      notices.push(
+        <ChatbotAlert key="loading" variant="info" title={t('state.loadingTitle')}>
+          <p>{t('loading.body')}</p>
+          {loadingProgress != null && (
+            <Progress value={loadingProgress} size={ProgressSize.sm} measureLocation={ProgressMeasureLocation.outside}
+              aria-label={stateText(backend, t)} />
+          )}
+        </ChatbotAlert>,
+      );
+    }
+  }
+
+  // ---- the footnote: the status in a few words; the rest under Options, Status
 
   const lastStats = useMemo(() => {
     for (const c of convs) for (let i = c.messages.length - 1; i >= 0; i--) {
@@ -451,24 +468,24 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   }, [convs]);
   const npuLine = npuWords(backend, npu, t);
   const served = backend.served || base(backend.model) || base(models?.current) || '';
+  const upFirst = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
   const footLabel = [
-    stateText(backend, t),
-    backend.state === 'ready' || backend.state === 'loading' ? t('status.npuLine', { state: npuLine[0] }) : '',
-    lastStats?.tps ? t('stats.tps', { tps: lastStats.tps.toFixed(1) }) : '',
-    lastStats?.ttft != null ? t('stats.ttft', { s: (lastStats.ttft / 1000).toFixed(2) }) : '',
+    upFirst(stateText(backend, t)),
+    serving ? t('status.npuLine', { state: npuLine[0] }) : '',
+    serving && lastStats?.tps ? t('stats.tps', { tps: lastStats.tps.toFixed(1) }) : '',
   ].filter(Boolean).join(' · ');
-  const footDetail = [
-    `${t('status.backend')}: ${backend.state === 'ready' && backend.port ? t('status.backendAt', { state: stateText(backend, t), port: backend.port }) : stateText(backend, t)}`,
-    `${t('status.model')}: ${served || '-'}${backend.context ? `, ctx ${backend.context}` : ''}`,
-    `${t('status.npu')}: ${npuLine.join(', ')}`,
-    `${t('status.speed')}: ${lastStats ? statsText({ id: '', role: 'assistant', content: '', stats: lastStats }, t) : '-'}`,
-  ].join('\n');
+  const statusRows: Array<[string, string]> = [
+    [t('status.backend'), backend.state === 'ready' && backend.port ? t('status.backendAt', { state: stateText(backend, t), port: backend.port }) : stateText(backend, t)],
+    [t('status.model'), `${served || '-'}${backend.context ? `, ctx ${backend.context}` : ''}`],
+    [t('status.npu'), npuLine.join(', ')],
+    [t('status.speed'), lastStats ? statsText({ id: '', role: 'assistant', content: '', stats: lastStats }, t) : '-'],
+  ];
 
   // ---- the model selector in the chatbot header
 
   const installed = models?.installed ?? [];
   const selectedPath = settings.model || '';
-  const selectorLabel = selectedPath ? base(selectedPath) : (served || base(models?.current) || t('bar.modelDefault'));
+  const selectorLabel = modelName(selectedPath || served || models?.current || '') || t('bar.modelDefault');
   const onSelectModel = (_e: ReactMouseEvent | undefined, value: string | number | undefined) => {
     if (value === '__manage') { setDialog('models'); return; }
     if (generating) return;
@@ -479,6 +496,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
 
   const onOption = (_e: ReactMouseEvent | undefined, value: string | number | undefined) => {
     switch (value) {
+      case 'status': setDialog('status'); break;
       case 'models': setDialog('models'); break;
       case 'settings': setDialog('settings'); break;
       case 'lang': setDialog('lang'); break;
@@ -498,43 +516,18 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
 
   const msgs = current?.messages ?? [];
   const lastBot = msgs.length && msgs[msgs.length - 1].role === 'assistant' ? msgs.length - 1 : -1;
-  const loadingProgress = backend.state === 'loading' && backend.total
-    ? Math.min(100, Math.round((100 * (backend.staged || 0)) / backend.total)) : null;
 
-  const masthead = (
-    <Masthead display={{ default: 'inline' }}>
-      <MastheadMain>
-        <MastheadBrand>
-          <MastheadLogo component="span" className="brand">
-            <img src={botAvatar} alt="" className="brand-mark" />
-            <span className="brand-name">{t('app.name')}</span>
-          </MastheadLogo>
-        </MastheadBrand>
-      </MastheadMain>
-      <MastheadContent>
-        <Toolbar isFullHeight isStatic>
-          <ToolbarContent>
-            <ToolbarGroup align={{ default: 'alignEnd' }}>
-              <ToolbarItem>
-                <Button variant="plain" onClick={() => setDialog('models')}>{t('menu.models')}</Button>
-              </ToolbarItem>
-              <ToolbarItem>
-                <Button variant="plain" icon={<GlobeIcon />} aria-label={t('lang.dialog')} title={t('lang.dialog')} onClick={() => setDialog('lang')}>
-                  <span lang={lang}>{LANG_NAMES[lang]}</span>
-                </Button>
-              </ToolbarItem>
-              <ToolbarItem>
-                <Button variant="plain" icon={<CogIcon />} onClick={() => setDialog('settings')}>{t('menu.settings')}</Button>
-              </ToolbarItem>
-            </ToolbarGroup>
-          </ToolbarContent>
-        </Toolbar>
-      </MastheadContent>
-    </Masthead>
+  const brand = (
+    <Bullseye>
+      <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }} flexWrap={{ default: 'nowrap' }}>
+        <Brand src={botAvatar} alt="" heights={{ default: '28px' }} />
+        <span>{t('app.name')}</span>
+      </Flex>
+    </Bullseye>
   );
 
   return (
-    <Page masthead={masthead} isContentFilled>
+    <>
       <Chatbot displayMode={DISPLAY} ariaLabel={t('app.name')}>
         <ChatbotConversationHistoryNav
           displayMode={DISPLAY}
@@ -560,21 +553,16 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                 <ChatbotHeaderMain>
                   <ChatbotHeaderMenu aria-expanded={drawer} onMenuToggle={() => setDrawer(!drawer)}
                     tooltipContent={t('menu.history')} menuAriaLabel={t('menu.history')} />
-                  <ChatbotHeaderTitle>
-                    <span className="conv-title" title={current ? titleOf(current, t) : t('conv.untitled')}>
-                      {current ? titleOf(current, t) : t('conv.untitled')}
-                    </span>
-                  </ChatbotHeaderTitle>
+                  <ChatbotHeaderTitle>{brand}</ChatbotHeaderTitle>
                 </ChatbotHeaderMain>
                 <ChatbotHeaderActions>
                   <ChatbotHeaderSelectorDropdown value={selectorLabel} onSelect={onSelectModel}
-                    menuToggleAriaLabel={t('model.label')} tooltipContent={t('model.label')}>
+                    menuToggleAriaLabel={t('model.label')} tooltipContent={selectorLabel}>
                     <DropdownList>
                       <DropdownItem value="" key="default" isSelected={!selectedPath}
-                        description={models?.current ? base(models.current) : undefined}>{t('bar.modelDefault')}</DropdownItem>
+                        description={models?.current ? modelName(models.current) : undefined}>{t('bar.modelDefault')}</DropdownItem>
                       {installed.map((m) => (
-                        <DropdownItem value={m.path} key={m.path} isSelected={selectedPath === m.path}
-                          description={models?.current === m.path ? t('models.configured') : undefined}>{m.file}</DropdownItem>
+                        <DropdownItem value={m.path} key={m.path} isSelected={selectedPath === m.path}>{modelName(m.file)}</DropdownItem>
                       ))}
                     </DropdownList>
                     <Divider component="li" />
@@ -593,6 +581,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                     <Divider component="li" />
                     <DropdownGroup>
                       <DropdownList>
+                        <DropdownItem value="status" key="status">{t('menu.status')}</DropdownItem>
                         <DropdownItem value="models" key="models">{t('menu.models')}</DropdownItem>
                         <DropdownItem value="settings" key="settings">{t('menu.settings')}</DropdownItem>
                         <DropdownItem value="lang" key="lang">{t('menu.language')}</DropdownItem>
@@ -610,50 +599,38 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
               </ChatbotHeader>
               <ChatbotContent>
                 <MessageBox announcement={announcement} enableSmartScroll>
-                  {notices.length > 0 && <div className="notices" aria-live="polite">{notices}</div>}
-                  {!msgs.length && (
-                    <>
-                      <ChatbotWelcomePrompt title={t('welcome.title')} description={
-                        serving ? t('welcome.description')
-                          : backend.state === 'starting' || backend.state === 'loading' ? t('chat.emptyLoading') : t('chat.emptyStopped')}
-                        prompts={serving ? welcome : []} />
-                      {(backend.state === 'starting' || backend.state === 'loading') && (
-                        <div className="loading">
-                          {loadingProgress != null
-                            ? <Progress value={loadingProgress} title={stateText(backend, t)} size={ProgressSize.sm} />
-                            : <Content component="p"><Spinner size="md" aria-hidden /> {stateText(backend, t)}</Content>}
-                        </div>
-                      )}
-                    </>
+                  {notices}
+                  {!msgs.length && (serving || !notices.length) && (
+                    <ChatbotWelcomePrompt title={t('welcome.title')} description={serving ? t('welcome.description') : t('chat.emptyStopped')}
+                      prompts={serving ? welcome : []} />
                   )}
                   {msgs.map((m, i) => {
                     const pending = generating && i === msgs.length - 1 && m.role === 'assistant';
                     const meta = statsText(m, t);
                     return (
-                      <Fragment key={m.id}>
-                        <Message
-                          id={m.id}
-                          role={m.role === 'user' ? 'user' : 'bot'}
-                          name={m.role === 'user' ? t('chat.you') : t('chat.assistant')}
-                          avatar={m.role === 'user' ? userAvatar : botAvatar}
-                          avatarProps={m.role === 'user' ? { isBordered: true } : undefined}
-                          content={m.content}
-                          isLoading={pending && !m.content}
-                          loadingWord={t('chat.loadingWord')}
-                          botWord={t('chat.botWord')}
-                          timestamp={m.at ? new Date(m.at).toLocaleString(lang) : undefined}
-                          openLinkInNewTab
-                          codeBlockProps={{ 'aria-label': t('chat.copy') }}
-                          error={m.error ? { title: t('chat.error', { msg: m.error }) } : undefined}
-                          actions={m.role === 'assistant' && m.content && !pending ? {
-                            copy: { onClick: () => { copyText(m.content); }, tooltipContent: t('chat.copy'), clickedTooltipContent: t('chat.copied'), ariaLabel: t('chat.copy') },
-                            ...(i === lastBot && serving ? {
-                              regenerate: { onClick: regenerate, tooltipContent: t('chat.regenerate'), ariaLabel: t('chat.regenerate'), icon: <RedoIcon /> },
-                            } : {}),
-                          } : undefined}
-                          extraContent={meta && !pending ? { afterMainContent: <div className="msg-stats">{meta}</div> } : undefined}
-                        />
-                      </Fragment>
+                      <Message
+                        key={m.id}
+                        id={m.id}
+                        role={m.role === 'user' ? 'user' : 'bot'}
+                        name={m.role === 'user' ? t('chat.you') : t('chat.assistant')}
+                        avatar={m.role === 'user' ? userAvatar : undefined}
+                        avatarProps={m.role === 'user' ? { isBordered: true } : undefined}
+                        content={m.content}
+                        isLoading={pending && !m.content}
+                        loadingWord={t('chat.loadingWord')}
+                        botWord={t('chat.botWord')}
+                        timestamp={m.at ? new Date(m.at).toLocaleString(lang) : undefined}
+                        openLinkInNewTab
+                        codeBlockProps={{ 'aria-label': t('chat.copy') }}
+                        error={m.error ? { title: t('chat.error', { msg: m.error }) } : undefined}
+                        actions={m.role === 'assistant' && m.content && !pending ? {
+                          copy: { onClick: () => { copyText(m.content); }, tooltipContent: t('chat.copy'), clickedTooltipContent: t('chat.copied'), ariaLabel: t('chat.copy') },
+                          ...(i === lastBot && serving ? {
+                            regenerate: { onClick: regenerate, tooltipContent: t('chat.regenerate'), ariaLabel: t('chat.regenerate'), icon: <RedoIcon /> },
+                          } : {}),
+                        } : undefined}
+                        extraContent={meta && !pending ? { afterMainContent: <Content component="small" className="msg-stats">{meta}</Content> } : undefined}
+                      />
                     );
                   })}
                 </MessageBox>
@@ -668,12 +645,15 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                   placeholder={serving ? t('chat.placeholder') : t('chat.placeholderWait')}
                   buttonProps={{ send: { tooltipContent: t('chat.send') }, stop: { tooltipContent: t('chat.stop') } }}
                 />
-                <ChatbotFootnote label={footLabel} popover={{ title: t('footnote.title'), description: footDetail, showClose: true }} />
+                <ChatbotFootnote label={footLabel} />
               </ChatbotFooter>
             </>
           }
         />
       </Chatbot>
+      {dialog === 'status' && (
+        <StatusModal rows={statusRows} onLog={() => setDialog('log')} onClose={() => setDialog('')} />
+      )}
       {dialog === 'models' && (
         <ModelsModal models={models} error={modelsError} pull={pull} setPull={setPull} settings={settings} backend={backend}
           onRefresh={refreshModels} onUse={(p) => { useModel(p); setDialog(''); }} onClose={() => setDialog('')} />
@@ -712,6 +692,6 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
           setDeleting(null);
         }} onClose={() => setDeleting(null)} />
       )}
-    </Page>
+    </>
   );
 }

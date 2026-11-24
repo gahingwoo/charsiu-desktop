@@ -3,7 +3,7 @@
 // src-tauri/src/lib.rs has, answering with what a TaishanPi 3M under Windows
 // would. Never part of the app; scripts/shots.mjs injects it.
 //
-//   ?scene=chat|welcome|failed  &lang=en|zh-CN
+//   ?scene=chat|welcome|loading|failed  &lang=en|zh-CN
 // SPDX-License-Identifier: GPL-2.0-only
 (function () {
   const q = new URLSearchParams(location.search);
@@ -36,7 +36,8 @@
     staged: null, total: null, npu: 'on', devices: 2, npuProblem: null, problem: null, detail: null,
   };
   const failed = { state: 'failed', npu: 'unknown', problem: 'no_model', detail: 'charsiu serve: no model set and none here. Try: charsiu pull' };
-  let snap = scene === 'failed' ? failed : ready;
+  const loading = { ...ready, state: 'loading', port: null, staged: 41, total: 113 };
+  let snap = scene === 'failed' ? failed : scene === 'loading' ? loading : ready;
   let chats = 0;
 
   const zoo = [

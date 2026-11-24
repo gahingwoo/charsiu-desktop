@@ -28,8 +28,8 @@ const chrome = process.env.CHROME || ['/usr/bin/google-chrome', '/usr/bin/chromi
 const browser = await chromium.launch({ executablePath: chrome, args: ['--font-render-hinting=none'] });
 const errors = [];
 
-async function shot(name, { scene = 'chat', lang = 'en', dark = false, then } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, colorScheme: dark ? 'dark' : 'light', locale: lang });
+async function shot(name, { scene = 'chat', lang = 'en', dark = false, size = [1280, 800], then } = {}) {
+  const ctx = await browser.newContext({ viewport: { width: size[0], height: size[1] }, deviceScaleFactor: 1, colorScheme: dark ? 'dark' : 'light', locale: lang });
   await ctx.addInitScript(mock);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
@@ -43,17 +43,28 @@ async function shot(name, { scene = 'chat', lang = 'en', dark = false, then } = 
   await ctx.close();
 }
 
+const history = async (p) => { await p.click('.pf-chatbot__button--toggle-menu'); await p.waitForTimeout(600); };
+const option = (label) => async (p) => {
+  await p.click('.pf-chatbot__button--toggle-options');
+  await p.waitForTimeout(300);
+  if (label) { await p.getByRole('menuitem', { name: label }).click(); await p.waitForTimeout(800); }
+};
+const wide = [2560, 1440];
+
 await shot('chat-light-en');
 await shot('chat-dark-zh', { lang: 'zh-CN', dark: true });
 await shot('welcome-light-zh', { scene: 'welcome', lang: 'zh-CN' });
-await shot('history-light-en', {
-  then: async (p) => { await p.click('.pf-chatbot__button--toggle-menu'); await p.waitForTimeout(600); },
-});
-await shot('models-dark-en', {
-  dark: true,
-  then: async (p) => { await p.getByRole('button', { name: 'Models' }).first().click(); await p.waitForTimeout(800); },
-});
+await shot('welcome-dark-en', { scene: 'welcome', dark: true });
+await shot('history-light-en', { then: history });
+await shot('history-dark-zh', { lang: 'zh-CN', dark: true, then: history });
+await shot('options-light-en', { then: option() });
+await shot('status-light-en', { then: option('Status') });
+await shot('models-dark-en', { dark: true, then: option('Models') });
+await shot('loading-light-en', { scene: 'loading' });
 await shot('failed-light-en', { scene: 'failed' });
+await shot('chat-light-en-2560', { size: wide });
+await shot('history-dark-en-2560', { dark: true, size: wide, then: history });
+await shot('welcome-light-zh-2560', { scene: 'welcome', lang: 'zh-CN', size: wide });
 
 // Two questions in a row must both be answered: after the first reply Send
 // stays available, even when a staging heartbeat arrives after "ready"

@@ -40,17 +40,20 @@ Tauri 2 with the system web view (WebView2 on Windows 11, WebKitGTK on
 Linux), because the board has 4 GB of memory and charsiu needs most of it.
 
 The page is React and the [PatternFly Chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview)
-extension, laid out as its "Embedded chatbot" demo: the conversation history
-drawer (new chat, search, rename, delete), the chatbot header with the model
-selector and the options menu, the message box (markdown, code blocks with
-copy, the typing indicator while a reply is read, copy and regenerate on a
-reply), the welcome prompt, the message bar (send, and stop while charsiu
-answers) and the footnote, which carries the status in words (backend, NPU,
-tokens/s, first token) with the details in its popover. Around it, the
-pieces shared with Maskrom Studio: the masthead, the language dialog, the
-About box on a blurred backdrop, settings as form sections, "Report a
-problem" with the log scrubbed of personal details, the theme (dark follows
-the system), and the rules for what is selectable. English and Simplified
+extension in its fullscreen display mode, laid out as the extension's own
+demo, so the window is the chatbot: the header (the conversation history
+menu, the name, the model selector and the options menu), the conversation
+history drawer (new chat, search, rename, delete), the message box (markdown,
+code blocks with copy, the typing indicator while a reply is read, copy and
+regenerate on a reply, problems as alerts above the conversation), the
+welcome prompt, the message bar (send, and stop while charsiu answers) and the
+footnote, which carries the status in a few words (backend, NPU, tokens/s).
+Options, Status has the details: the port, the model, the NPU driver and its
+per-core busy figures, the last reply's speed. Around it, the pieces shared
+with Maskrom Studio: the language dialog, the About box on a blurred
+backdrop, settings as form sections, "Report a problem" with the log
+scrubbed of personal details, the theme (dark follows the system), and the
+rules for what is selectable. English and Simplified
 Chinese (`src/messages.ts`).
 
 ## Build
@@ -93,12 +96,12 @@ Windows (TaishanPi 3M, Windows 11 23H2 arm64):
 1. Install charsiu: `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
    (or the branch build the release notes name). Check `charsiu "hello"` in a
    new terminal.
-2. Run the installer `Charsiu Desktop_0.1.1_arm64-setup.exe` from the
+2. Run the installer `Charsiu Desktop_0.2.0_arm64-setup.exe` from the
    `charsiu-desktop-windows-arm64` artifact. It installs for the current user;
    WebView2 is already part of Windows 11.
 3. Start Charsiu Desktop from the Start menu. Expected, in the footnote under
-   the message bar: "loading the model", then "ready · NPU in use, 2 cores";
-   its popover has the port, the model and "driver started" with
+   the message bar: "Loading the model", then "Ready · NPU in use, 2 cores";
+   Options, Status has the port, the model and "driver started" with
    the per-core busy figures while a reply is written (if the counters are
    registered, see woa-rk3576-npu docs/PERFCOUNTERS.md). The first start of a
    model takes about a minute (quantising, writing the weight cache); later
@@ -106,8 +109,8 @@ Windows (TaishanPi 3M, Windows 11 23H2 arm64):
 4. Ask something (or click a welcome prompt); check the typing indicator,
    then the reply streams, Stop ends it within a token or two, Copy and
    Regenerate work, a code block has its own copy button, and the footnote
-   shows tokens/s (M7 measured 14 to 16 on Llama 3.2 1B) and the first-token
-   time. If config.ini names a model outside the models folder (for example
+   shows tokens/s (M7 measured 14 to 16 on Llama 3.2 1B); the first-token
+   time is under each reply. If config.ini names a model outside the models folder (for example
    R:\npu\Llama-3.2-1B-Instruct-Q8_0.gguf), the model selector lists it as
    the config's model.
 5. Conversations: open the drawer, start a new chat, search, rename and
@@ -126,7 +129,7 @@ Linux (Armbian edge with rocket, or any arm64 Debian/Ubuntu with charsiu):
 
 1. `sudo apt install charsiu` (Armbian) or charsiu's installer, then
    `charsiu "hello"`.
-2. `sudo apt install ./charsiu-desktop_0.1.1_arm64.deb` from the
+2. `sudo apt install ./charsiu-desktop_0.2.0_arm64.deb` from the
    `charsiu-desktop-linux-arm64-deb` artifact.
 3. Start Charsiu Desktop from the menu and repeat steps 3 to 6 above. NPU shows
    "rocket driver loaded, 2 of 2 cores active" while it answers.

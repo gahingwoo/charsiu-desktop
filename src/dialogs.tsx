@@ -5,7 +5,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Button, CodeBlock, CodeBlockAction, CodeBlockCode, Content, Form, FormGroup, FormHelperText, FormSection, HelperText,
+  Button, CodeBlock, CodeBlockAction, CodeBlockCode, Content, DescriptionList, DescriptionListDescription,
+  DescriptionListGroup, DescriptionListTerm, Form, FormGroup, FormHelperText, FormSection, HelperText,
   HelperTextItem, Menu, MenuContent, MenuItem, MenuList, Modal, ModalBody, ModalFooter, ModalHeader, Stack, TextArea,
   TextInput, ToggleGroup, ToggleGroupItem,
 } from '@patternfly/react-core';
@@ -94,7 +95,7 @@ export function AboutModal({ open, info, onReport, onClose }: { open: boolean; i
     <a href={href} onClick={(e) => { e.preventDefault(); openUrl(href); }}>{text}</a>
   );
   const rows: Array<[string, React.ReactNode]> = [
-    [t('about.version'), t('about.version.value', { version: info.version || '0.1.1', commit: BUILD.commit, date: BUILD.date })],
+    [t('about.version'), t('about.version.value', { version: info.version || '0.2.0', commit: BUILD.commit, date: BUILD.date })],
     [t('about.design'), `PatternFly ${BUILD.patternfly}, PatternFly Chatbot ${BUILD.chatbot}`],
     [t('about.runtime'), t('about.runtime.value')],
     [t('about.charsiu'), <span className="selectable">{info.charsiu || '-'}</span>],
@@ -199,7 +200,7 @@ export function SettingsModal({ settings, info, onSave, onAbout, onClose }: {
           </FormSection>
           <FormSection title={t('settings.version')} titleElement="h3">
             <FormGroup fieldId="about-open">
-              <Content component="p">{`${info.version || '0.1.1'} (${BUILD.commit})`}</Content>
+              <Content component="p">{`${info.version || '0.2.0'} (${BUILD.commit})`}</Content>
               <Button id="about-open" variant="link" isInline onClick={onAbout}>{t('about.open')}</Button>
             </FormGroup>
           </FormSection>
@@ -239,7 +240,7 @@ export function LogModal({ info, backend, npuLine, model, onClose }: {
   const who = { home: info.home || '', user: info.user || '' };
   const log = lines ?? [];
   const facts = {
-    version: info.version || '0.1.1', commit: BUILD.commit, os: info.os || 'unknown',
+    version: info.version || '0.2.0', commit: BUILD.commit, os: info.os || 'unknown',
     backend: `${backend.state}${backend.problem ? ` (${backend.problem})` : ''}`, npu: npuLine, model: model || '-', what, log,
   };
   const actions = (
@@ -306,6 +307,32 @@ export function ConfirmDelete({ title, onDelete, onClose }: { title: string; onD
       <ModalFooter>
         <Button variant="danger" onClick={onDelete}>{t('common.delete')}</Button>
         <Button variant="link" onClick={onClose}>{t('common.cancel')}</Button>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
+/* What the app is running on, as key and value rows: the backend, the model,
+   the NPU and the last reply's speed. The footnote under the message bar is
+   the short form of this. */
+export function StatusModal({ rows, onLog, onClose }: { rows: Array<[string, string]>; onLog: () => void; onClose: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Modal isOpen variant="medium" onClose={onClose} aria-labelledby="status-title">
+      <ModalHeader title={t('menu.status')} labelId="status-title" />
+      <ModalBody>
+        <DescriptionList isHorizontal termWidth="9rem">
+          {rows.map(([k, v]) => (
+            <DescriptionListGroup key={k}>
+              <DescriptionListTerm>{k}</DescriptionListTerm>
+              <DescriptionListDescription className="selectable">{v}</DescriptionListDescription>
+            </DescriptionListGroup>
+          ))}
+        </DescriptionList>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="secondary" onClick={onLog}>{t('menu.report')}</Button>
+        <Button variant="link" onClick={onClose}>{t('common.close')}</Button>
       </ModalFooter>
     </Modal>
   );

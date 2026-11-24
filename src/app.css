@@ -1,14 +1,11 @@
 /* Page CSS on top of PatternFly and the PatternFly Chatbot. The shell rules
-   (one scroll container, what is selectable, the masthead mark, focus, the
+   (one scroll container, what is selectable, focus, the
    About box and the blurred backdrop) are Maskrom Studio's src/renderer/app.css
    (same author and licence); the rest is this app's.
    SPDX-License-Identifier: GPL-2.0-only */
-/* One scroll container per view: the wizard's main column in the wizard,
-   PatternFly's page main elsewhere (the run view), the modal body in a
-   dialog. The document itself never scrolls, so a wheel anywhere over the
-   content reaches the element that can move. */
+/* The chatbot is the whole window and scrolls its own message box; the
+   document itself never scrolls. */
 html, body, #root { height: 100%; overflow: hidden; }
-.pf-v6-c-page { height: 100%; }
 
 /* A desktop app, not a web page: the chrome and static text are not
    selectable by a stray drag or a double click, and Ctrl+A in it selects
@@ -23,14 +20,6 @@ input, textarea, [contenteditable="true"],
 .pf-v6-c-description-list__description {
   user-select: text; -webkit-user-select: text;
 }
-
-/* Masthead: the mark at its own size beside the name (PatternFly sizes the
-   logo slot for a wide wordmark). */
-.pf-v6-c-masthead__logo { --pf-v6-c-masthead__logo--Width: auto; }
-.brand { display: flex; align-items: center; gap: var(--pf-t--global--spacer--sm); text-decoration: none; }
-.brand-mark { height: 1.75rem; width: auto; }
-/* The masthead column is min-content wide: keep the name on one line. */
-.brand-name { font-size: var(--pf-t--global--font--size--lg); color: var(--pf-t--global--text--color--regular); white-space: nowrap; }
 
 :focus-visible { outline-color: var(--pf-t--global--focus-ring--color--default); }
 /* A text field shows focus once, with its own border (PatternFly's hover
@@ -92,35 +81,20 @@ html.pf-v6-theme-dark .credit-badge__mark { fill: #8b73c9; }
 html.pf-v6-theme-dark .credit-badge__name { fill: var(--pf-t--global--text--color--subtle); }
 html.pf-v6-theme-dark .credit-badge__label { fill: var(--pf-t--global--text--color--subtle); opacity: 0.7; }
 
-
-
 /* Chat text, code and the status are what people copy. */
 .pf-chatbot__message-text, .pf-chatbot__message-text *, .pf-chatbot__message-and-actions,
-.msg-stats, .pf-chatbot__popover--footnote, .mono { user-select: text; -webkit-user-select: text; }
+.msg-stats, .pf-chatbot__footnote, .mono { user-select: text; -webkit-user-select: text; }
 .mono { font-family: var(--pf-t--global--font--family--mono); font-size: var(--pf-t--global--font--size--sm); word-break: break-all; }
 
-/* Regular-weight headings, the house style. */
-.regular, .pf-chatbot__hello { font-weight: var(--pf-t--global--font--weight--body--default); }
-
-/* The conversation's name in the chatbot header: one line. */
-.conv-title {
-  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--pf-t--global--font--size--lg);
-  color: var(--pf-t--global--text--color--regular);
-}
-
-/* Problems, above the conversation, in the message box's measure. */
-.notices { display: grid; gap: var(--pf-t--global--spacer--md); margin-block-end: var(--pf-t--global--spacer--lg); }
-.notices .pf-v6-c-code-block { margin-block-start: var(--pf-t--global--spacer--sm); }
-.loading { max-width: 32rem; padding-inline: var(--pf-t--global--spacer--lg); }
-
-/* A reply's speed, under it. */
-.msg-stats { color: var(--pf-t--global--text--color--subtle); font-size: var(--pf-t--global--font--size--sm); margin-block-start: var(--pf-t--global--spacer--xs); }
-
-/* The status popover (the footnote's) keeps its lines. */
-.pf-chatbot__popover--footnote .pf-v6-c-popover__body { white-space: pre-line; }
+/* A notice above the conversation stays in view while it scrolls, from the
+   top of the message box: the Chatbot's own offset (a spacer below the box's
+   padding) pushes it over the welcome text. */
+.pf-chatbot__messagebox > .pf-chatbot__alert { top: 0; }
 
 /* The models tables. */
 @media (min-width: 48rem) { .nowrap { white-space: nowrap; } .models-action { min-width: 12rem; } }
 .models-note { color: var(--pf-t--global--text--color--subtle); }
 .log .pf-v6-c-code-block__code { max-height: 18rem; overflow: auto; display: block; white-space: pre-wrap; }
+
+/* Regular-weight headings in the dialogs, the house style. */
+.regular { font-weight: var(--pf-t--global--font--weight--body--default); }
