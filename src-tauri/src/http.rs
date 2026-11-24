@@ -275,6 +275,11 @@ mod tests {
             for b in out.as_bytes().chunks(7) {
                 c.write_all(b).unwrap();
             }
+            // Read what is left of the request before closing: a socket
+            // closed with unread input sends a reset, which can reach the
+            // client before the last chunks and cut the reply short.
+            let _ = c.shutdown(std::net::Shutdown::Write);
+            while matches!(c.read(&mut req), Ok(n) if n > 0) {}
         });
         let got = Mutex::new(Vec::new());
         chat(port, "{}", &|e| {
