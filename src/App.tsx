@@ -629,7 +629,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
                           content={m.content}
                           isLoading={pending && !m.content}
                           loadingWord={t('chat.loadingWord')}
-                          botWord={t('chat.assistant')}
+                          botWord={t('chat.botWord')}
                           timestamp={m.at ? new Date(m.at).toLocaleString(lang) : undefined}
                           openLinkInNewTab
                           codeBlockProps={{ 'aria-label': t('chat.copy') }}
@@ -650,13 +650,14 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
               <ChatbotFooter>
                 <MessageBar
                   onSendMessage={send}
+                  hasAttachButton={false}
                   hasStopButton={generating}
                   handleStopButton={stop}
                   isSendButtonDisabled={generating || backend.state !== 'ready'}
                   placeholder={backend.state === 'ready' ? t('chat.placeholder') : t('chat.placeholderWait')}
                   buttonProps={{ send: { tooltipContent: t('chat.send') }, stop: { tooltipContent: t('chat.stop') } }}
                 />
-                <ChatbotFootnote label={footLabel} popover={{ title: t('footnote.title'), description: footDetail, popoverProps: { className: 'status-popover' } }} />
+                <ChatbotFootnote label={footLabel} popover={{ title: t('footnote.title'), description: footDetail, showClose: true }} />
               </ChatbotFooter>
             </>
           }

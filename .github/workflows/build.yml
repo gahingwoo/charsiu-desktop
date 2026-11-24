@@ -67,6 +67,8 @@ jobs:
           cache: npm
       - name: Build and shoot
         run: |
+          # the Chinese screenshot needs a CJK font, as Windows and Linux desktops have
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
           npm ci --ignore-scripts --no-audit --no-fund
           npm run build
           CHROME=$(command -v google-chrome || command -v chromium) npm run shots

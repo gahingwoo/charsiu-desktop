@@ -96,7 +96,7 @@ html.pf-v6-theme-dark .credit-badge__label { fill: var(--pf-t--global--text--col
 
 /* Chat text, code and the status are what people copy. */
 .pf-chatbot__message-text, .pf-chatbot__message-text *, .pf-chatbot__message-and-actions,
-.msg-stats, .status-popover, .mono { user-select: text; -webkit-user-select: text; }
+.msg-stats, .pf-chatbot__popover--footnote, .mono { user-select: text; -webkit-user-select: text; }
 .mono { font-family: var(--pf-t--global--font--family--mono); font-size: var(--pf-t--global--font--size--sm); word-break: break-all; }
 
 /* Regular-weight headings, the house style. */
@@ -117,8 +117,8 @@ html.pf-v6-theme-dark .credit-badge__label { fill: var(--pf-t--global--text--col
 /* A reply's speed, under it. */
 .msg-stats { color: var(--pf-t--global--text--color--subtle); font-size: var(--pf-t--global--font--size--sm); margin-block-start: var(--pf-t--global--spacer--xs); }
 
-/* The status popover keeps its lines. */
-.status-popover .pf-v6-c-popover__body { white-space: pre-line; }
+/* The status popover (the footnote's) keeps its lines. */
+.pf-chatbot__popover--footnote .pf-v6-c-popover__body { white-space: pre-line; }
 
 /* The models tables. */
 @media (min-width: 48rem) { .nowrap { white-space: nowrap; } .models-action { min-width: 12rem; } }
