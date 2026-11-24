@@ -3,7 +3,7 @@
    About box and the blurred backdrop) are Maskrom Studio's src/renderer/app.css
    (same author and licence); the rest is this app's.
    SPDX-License-Identifier: GPL-2.0-only */
-/* The chatbot is the whole window and scrolls its own message box; the
+/* The chatbot fills the window and scrolls its own message box; the
    document itself never scrolls. */
 html, body, #root { height: 100%; overflow: hidden; }
 
@@ -90,6 +90,9 @@ html.pf-v6-theme-dark .credit-badge__label { fill: var(--pf-t--global--text--col
    top of the message box: the Chatbot's own offset (a spacer below the box's
    padding) pushes it over the welcome text. */
 .pf-chatbot__messagebox > .pf-chatbot__alert { top: 0; }
+
+/* The status in the footnote's popover, one line per row. */
+.pf-chatbot__popover--footnote .pf-v6-c-popover__body { white-space: pre-line; }
 
 /* The models tables. */
 @media (min-width: 48rem) { .nowrap { white-space: nowrap; } .models-action { min-width: 12rem; } }

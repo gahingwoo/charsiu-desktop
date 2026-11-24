@@ -1,14 +1,18 @@
-// Charsiu Desktop, the page: PatternFly's Chatbot in fullscreen display mode,
-// the whole window, laid out as the Chatbot extension's own demo (header with
-// the history menu, the name, the model selector and the options; the message
-// box; the message bar and a footnote). Everything that touches the system is
-// a Rust command (src/api.ts); this keeps the conversations and draws.
+// Charsiu Desktop, the page: the PatternFly Chatbot extension's "Fullscreen
+// chatbot with docked navigation" demo (the chatbot fills the window, a
+// docked rail with the history toggle, the logo, New chat and Settings; the
+// history drawer; the message box, message bar and footnote; settings drawn in
+// place of the conversation), with this app's content. Everything that
+// touches the system is a Rust command (src/api.ts); this keeps the conversations and draws.
 // SPDX-License-Identifier: GPL-2.0-only
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
-  AlertActionLink, Brand, Bullseye, CodeBlock, CodeBlockCode, Content, Divider, DropdownGroup, DropdownItem, DropdownList,
-  Flex, Progress, ProgressMeasureLocation, ProgressSize,
+  AlertActionLink, Brand, CodeBlock, CodeBlockCode, Content, Divider, DropdownItem, Masthead, MastheadBrand, MastheadContent,
+  MastheadLogo, MastheadMain, MastheadToggle, Nav, NavItem, NavList, PageToggleButton, Progress, ProgressMeasureLocation,
+  ProgressSize, Tooltip,
 } from '@patternfly/react-core';
+import { RhUiEditFillIcon } from '@patternfly/react-icons/dist/esm/icons/rh-ui-edit-fill-icon';
+import { RhUiSettingsFillIcon } from '@patternfly/react-icons/dist/esm/icons/rh-ui-settings-fill-icon';
 import { RedoIcon } from '@patternfly/react-icons/dist/esm/icons/redo-icon';
 import Chatbot, { ChatbotDisplayMode } from '@patternfly/chatbot/dist/dynamic/Chatbot';
 import ChatbotAlert from '@patternfly/chatbot/dist/dynamic/ChatbotAlert';
@@ -16,13 +20,9 @@ import ChatbotContent from '@patternfly/chatbot/dist/dynamic/ChatbotContent';
 import ChatbotWelcomePrompt from '@patternfly/chatbot/dist/dynamic/ChatbotWelcomePrompt';
 import ChatbotFooter, { ChatbotFootnote } from '@patternfly/chatbot/dist/dynamic/ChatbotFooter';
 import MessageBar from '@patternfly/chatbot/dist/dynamic/MessageBar';
-import MessageBox from '@patternfly/chatbot/dist/dynamic/MessageBox';
+import MessageBox, { type MessageBoxHandle } from '@patternfly/chatbot/dist/dynamic/MessageBox';
 import Message from '@patternfly/chatbot/dist/dynamic/Message';
 import ChatbotConversationHistoryNav, { type Conversation } from '@patternfly/chatbot/dist/dynamic/ChatbotConversationHistoryNav';
-import ChatbotHeader, {
-  ChatbotHeaderActions, ChatbotHeaderMain, ChatbotHeaderMenu, ChatbotHeaderOptionsDropdown, ChatbotHeaderSelectorDropdown,
-  ChatbotHeaderTitle,
-} from '@patternfly/chatbot/dist/dynamic/ChatbotHeader';
 import {
   base, channel, DEFAULTS, INSTALL, invoke, tauri, uid, copyText,
   type ChatEvent, type Conv, type Info, type Models, type Msg, type NpuStatus, type PullStatus, type Settings, type Snapshot,
@@ -30,12 +30,34 @@ import {
 import { useI18n } from './i18n';
 import type { T } from './i18n-core';
 import { applyTheme, followSystem } from './theme';
-import { AboutModal, ConfirmDelete, LangModal, LogModal, RenameModal, SettingsModal, StatusModal } from './dialogs';
+import { AboutModal, ConfirmDelete, LogModal, RenameModal, SettingsModal } from './dialogs';
+import { SettingsPanel } from './settings-panel';
 import { ModelsModal } from './models';
 import botAvatar from '../src-tauri/icons/128x128.png';
 import userAvatar from './user-avatar.svg';
 
-const DISPLAY = ChatbotDisplayMode.fullscreen;
+// The rail's hover styles, verbatim from the demo.
+const hamburgerHoverStyles = `
+  .pf-chatbot__canvas-docked-nav .pf-v6-c-masthead__logo.pf-m-compact {
+    display: revert;
+  }
+
+  .pf-chatbot__canvas-docked-nav .pf-v6-c-nav.pf-m-docked .pf-v6-c-nav__link-text {
+    display: none;
+  }
+
+  .pf-chatbot__canvas-history-toggle.pf-v6-c-button.pf-m-hamburger:is(:hover, :focus-visible) {
+    --pf-v6-c-button--hamburger-icon--top--path: var(--pf-v6-c-button--hamburger-icon--top--collapse--path);
+    --pf-v6-c-button--hamburger-icon--arrow--path: var(--pf-v6-c-button--hamburger-icon--arrow--collapse--path);
+    --pf-v6-c-button--hamburger-icon--bottom--path: var(--pf-v6-c-button--hamburger-icon--bottom--collapse--path);
+    --pf-v6-c-button__icon--TransitionDelay: 0s;
+    --pf-v6-c-button__icon--ScaleX: var(--pf-v6-c-button--m-hamburger__icon--m-expand--ScaleX);
+  }
+
+  .pf-chatbot__canvas-history-toggle.pf-v6-c-button.pf-m-hamburger[aria-expanded="true"]:is(:hover, :focus-visible) {
+    --pf-v6-c-button__icon--ScaleX: var(--pf-v6-c-button--m-hamburger__icon--m-collapse--ScaleX);
+  }
+`;
 
 /** A model file's name as people say it: no folder, no .gguf. */
 export const modelName = (p: string) => base(p).replace(/\.gguf$/i, '');
@@ -108,9 +130,13 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   const [generating, setGeneratingState] = useState(false);
   const generatingRef = useRef(false);
   const setGenerating = (v: boolean) => { generatingRef.current = v; setGeneratingState(v); };
-  const [drawer, setDrawer] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [areSettingsOpen, setAreSettingsOpen] = useState(false);
+  const newChatRef = useRef<HTMLAnchorElement>(null);
+  const messageBoxRef = useRef<MessageBoxHandle>(null);
+  const settingsNavRef = useRef<HTMLAnchorElement>(null);
   const [search, setSearch] = useState('');
-  const [dialog, setDialog] = useState<'' | 'status' | 'models' | 'settings' | 'lang' | 'about' | 'log'>('');
+  const [dialog, setDialog] = useState<'' | 'models' | 'settings' | 'about' | 'log'>('');
   const [renaming, setRenaming] = useState<Conv | null>(null);
   const [deleting, setDeleting] = useState<Conv | null>(null);
   const [announcement, setAnnouncement] = useState('');
@@ -202,6 +228,12 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     return () => { if (unlisten) unlisten(); };
   }, [startBackend, refreshModels]);
 
+  // A conversation opens at its latest message (smart scroll follows from
+  // there while a reply streams).
+  useEffect(() => {
+    window.requestAnimationFrame(() => messageBoxRef.current?.scrollToBottom({ resumeSmartScroll: true }));
+  }, [currentId, loaded, areSettingsOpen]);
+
   // ---- theme
 
   useEffect(() => { applyTheme(settings.theme); }, [settings.theme]);
@@ -230,7 +262,6 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     const c: Conv = { id: uid(), title: '', created: Date.now(), updated: Date.now(), messages: [] };
     setCurrentId(c.id);
     update((list) => [c, ...list], c.id);
-    setDrawer(false);
   };
 
   const ensureConversation = (): Conv => {
@@ -341,10 +372,6 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     ask(current, ms.slice(0, end));
   };
 
-  const clearConversation = () => {
-    if (!current || generating) return;
-    update((list) => list.map((c) => (c.id === current.id ? { ...c, messages: [], title: '', updated: Date.now() } : c)));
-  };
 
   // ---- models
 
@@ -494,20 +521,6 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     useModel(v);
   };
 
-  const onOption = (_e: ReactMouseEvent | undefined, value: string | number | undefined) => {
-    switch (value) {
-      case 'status': setDialog('status'); break;
-      case 'models': setDialog('models'); break;
-      case 'settings': setDialog('settings'); break;
-      case 'lang': setDialog('lang'); break;
-      case 'log': setDialog('log'); break;
-      case 'about': setDialog('about'); break;
-      case 'clear': clearConversation(); break;
-      case 'restart': startBackend(); break;
-      default:
-    }
-  };
-
   const welcome = [1, 2, 3].map((i) => ({
     title: t(`prompt.${i}.title`),
     message: t(`prompt.${i}.message`),
@@ -517,143 +530,202 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
   const msgs = current?.messages ?? [];
   const lastBot = msgs.length && msgs[msgs.length - 1].role === 'assistant' ? msgs.length - 1 : -1;
 
-  const brand = (
-    <Bullseye>
-      <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }} flexWrap={{ default: 'nowrap' }}>
-        <Brand src={botAvatar} alt="" heights={{ default: '28px' }} />
-        <span>{t('app.name')}</span>
-      </Flex>
-    </Bullseye>
+  const modelChoices = [
+    { value: '', label: models?.current ? t('model.configDefault', { name: modelName(models.current) }) : t('bar.modelDefault') },
+    ...installed.map((m) => ({ value: m.path, label: modelName(m.file) })),
+  ];
+
+  const openSettings = () => { setIsDrawerOpen(false); setAreSettingsOpen(true); };
+  const closeSettings = () => {
+    setAreSettingsOpen(false);
+    window.requestAnimationFrame(() => settingsNavRef.current?.focus());
+  };
+  const startNewChat = () => {
+    newConversation();
+    setIsDrawerOpen(false);
+    setAreSettingsOpen(false);
+  };
+
+  // ---- from here on, the Chatbot extension's "Fullscreen chatbot with
+  // docked navigation" demo (patternfly-docs/content/extensions/chatbot/
+  // examples/demos/FullscreenDockedNav.tsx, @patternfly/chatbot 6.9.0), with
+  // this app's content. The demo's user avatar at the foot of the rail is
+  // left out: this app has no user account to show.
+
+  const dockedNav = (
+    <>
+      <style>{hamburgerHoverStyles}</style>
+      <div className="pf-chatbot__canvas-docked-nav pf-v6-u-h-100 pf-v6-u-p-sm">
+        <Masthead variant="docked">
+          <MastheadMain>
+            <MastheadToggle>
+              <PageToggleButton
+                className="pf-chatbot__canvas-history-toggle"
+                aria-label={t('menu.history')}
+                isHamburgerButton
+                isSidebarOpen={isDrawerOpen}
+                onSidebarToggle={() => setIsDrawerOpen((open) => !open)}
+              />
+            </MastheadToggle>
+            <MastheadBrand>
+              <MastheadLogo isCompact>
+                <Brand src={botAvatar} alt={t('app.name')} heights={{ default: '37px' }} />
+              </MastheadLogo>
+            </MastheadBrand>
+          </MastheadMain>
+          <MastheadContent>
+            <Divider />
+            <Nav
+              variant="docked"
+              aria-label={t('menu.navigation')}
+              className="pf-v6-u-flex-1 pf-v6-u-align-content-space-between"
+            >
+              <NavList>
+                <NavItem
+                  itemId="new-chat"
+                  aria-label={t('conv.new')}
+                  icon={<RhUiEditFillIcon />}
+                  component="button"
+                  preventDefault
+                  anchorRef={newChatRef}
+                  onClick={startNewChat}
+                >
+                  {t('conv.new')}
+                </NavItem>
+              </NavList>
+              <NavList className="pf-v6-u-mt-auto">
+                <NavItem
+                  itemId="settings"
+                  aria-label={t('menu.settings')}
+                  icon={<RhUiSettingsFillIcon />}
+                  component="button"
+                  preventDefault
+                  anchorRef={settingsNavRef}
+                  onClick={openSettings}
+                >
+                  {t('menu.settings')}
+                </NavItem>
+              </NavList>
+            </Nav>
+            <Tooltip aria="none" aria-live="off" triggerRef={newChatRef} content={t('conv.new')} />
+            <Tooltip aria="none" aria-live="off" triggerRef={settingsNavRef} content={t('menu.settings')} />
+          </MastheadContent>
+        </Masthead>
+      </div>
+    </>
   );
 
   return (
     <>
-      <Chatbot displayMode={DISPLAY} ariaLabel={t('app.name')}>
-        <ChatbotConversationHistoryNav
-          displayMode={DISPLAY}
-          onDrawerToggle={() => setDrawer(!drawer)}
-          isDrawerOpen={drawer}
-          setIsDrawerOpen={setDrawer}
-          activeItemId={currentId ?? undefined}
-          onSelectActiveItem={(_e?: ReactMouseEvent, id?: string | number) => { if (!generating && id) { setCurrentId(String(id)); saveConvs(convsRef.current, String(id)); setDrawer(false); } }}
-          conversations={groups}
-          title={t('menu.history')}
-          newChatButtonText={t('conv.new')}
-          newChatButtonProps={{ isDisabled: generating }}
-          onNewChat={newConversation}
-          searchInputPlaceholder={t('conv.search')}
-          searchInputAriaLabel={t('conv.search')}
-          handleTextInputChange={(v: string) => setSearch(v)}
-          emptyState={convs.length ? undefined : { titleText: t('conv.empty'), headingLevel: 'h4' }}
-          noResultsState={convs.length && search.trim() && !Object.keys(groups).length
-            ? { titleText: t('conv.noResults'), headingLevel: 'h4' } : undefined}
-          drawerContent={
-            <>
-              <ChatbotHeader>
-                <ChatbotHeaderMain>
-                  <ChatbotHeaderMenu aria-expanded={drawer} onMenuToggle={() => setDrawer(!drawer)}
-                    tooltipContent={t('menu.history')} menuAriaLabel={t('menu.history')} />
-                  <ChatbotHeaderTitle>{brand}</ChatbotHeaderTitle>
-                </ChatbotHeaderMain>
-                <ChatbotHeaderActions>
-                  <ChatbotHeaderSelectorDropdown value={selectorLabel} onSelect={onSelectModel}
-                    menuToggleAriaLabel={t('model.label')} tooltipContent={selectorLabel}>
-                    <DropdownList>
-                      <DropdownItem value="" key="default" isSelected={!selectedPath}
-                        description={models?.current ? modelName(models.current) : undefined}>{t('bar.modelDefault')}</DropdownItem>
-                      {installed.map((m) => (
-                        <DropdownItem value={m.path} key={m.path} isSelected={selectedPath === m.path}>{modelName(m.file)}</DropdownItem>
-                      ))}
-                    </DropdownList>
-                    <Divider component="li" />
-                    <DropdownList>
-                      <DropdownItem value="__manage" key="manage">{t('menu.manageModels')}</DropdownItem>
-                    </DropdownList>
-                  </ChatbotHeaderSelectorDropdown>
-                  <ChatbotHeaderOptionsDropdown onSelect={onOption} menuToggleAriaLabel={t('menu.options')}
-                    tooltipProps={{ content: t('menu.options') }}>
-                    <DropdownGroup>
-                      <DropdownList>
-                        <DropdownItem value="clear" key="clear" isDisabled={!current || !msgs.length || generating}>{t('menu.clear')}</DropdownItem>
-                        <DropdownItem value="restart" key="restart" isDisabled={generating}>{t('menu.restart')}</DropdownItem>
-                      </DropdownList>
-                    </DropdownGroup>
-                    <Divider component="li" />
-                    <DropdownGroup>
-                      <DropdownList>
-                        <DropdownItem value="status" key="status">{t('menu.status')}</DropdownItem>
-                        <DropdownItem value="models" key="models">{t('menu.models')}</DropdownItem>
-                        <DropdownItem value="settings" key="settings">{t('menu.settings')}</DropdownItem>
-                        <DropdownItem value="lang" key="lang">{t('menu.language')}</DropdownItem>
-                      </DropdownList>
-                    </DropdownGroup>
-                    <Divider component="li" />
-                    <DropdownGroup>
-                      <DropdownList>
-                        <DropdownItem value="log" key="log">{t('menu.report')}</DropdownItem>
-                        <DropdownItem value="about" key="about">{t('menu.about')}</DropdownItem>
-                      </DropdownList>
-                    </DropdownGroup>
-                  </ChatbotHeaderOptionsDropdown>
-                </ChatbotHeaderActions>
-              </ChatbotHeader>
-              <ChatbotContent>
-                <MessageBox announcement={announcement} enableSmartScroll>
-                  {notices}
-                  {!msgs.length && (serving || !notices.length) && (
-                    <ChatbotWelcomePrompt title={t('welcome.title')} description={serving ? t('welcome.description') : t('chat.emptyStopped')}
-                      prompts={serving ? welcome : []} />
-                  )}
-                  {msgs.map((m, i) => {
-                    const pending = generating && i === msgs.length - 1 && m.role === 'assistant';
-                    const meta = statsText(m, t);
-                    return (
-                      <Message
-                        key={m.id}
-                        id={m.id}
-                        role={m.role === 'user' ? 'user' : 'bot'}
-                        name={m.role === 'user' ? t('chat.you') : t('chat.assistant')}
-                        avatar={m.role === 'user' ? userAvatar : undefined}
-                        avatarProps={m.role === 'user' ? { isBordered: true } : undefined}
-                        content={m.content}
-                        isLoading={pending && !m.content}
-                        loadingWord={t('chat.loadingWord')}
-                        botWord={t('chat.botWord')}
-                        timestamp={m.at ? new Date(m.at).toLocaleString(lang) : undefined}
-                        openLinkInNewTab
-                        codeBlockProps={{ 'aria-label': t('chat.copy') }}
-                        error={m.error ? { title: t('chat.error', { msg: m.error }) } : undefined}
-                        actions={m.role === 'assistant' && m.content && !pending ? {
-                          copy: { onClick: () => { copyText(m.content); }, tooltipContent: t('chat.copy'), clickedTooltipContent: t('chat.copied'), ariaLabel: t('chat.copy') },
-                          ...(i === lastBot && serving ? {
-                            regenerate: { onClick: regenerate, tooltipContent: t('chat.regenerate'), ariaLabel: t('chat.regenerate'), icon: <RedoIcon /> },
-                          } : {}),
-                        } : undefined}
-                        extraContent={meta && !pending ? { afterMainContent: <Content component="small" className="msg-stats">{meta}</Content> } : undefined}
+      <Chatbot displayMode={ChatbotDisplayMode.fullscreen} dockedNav={dockedNav} ariaLabel={t('app.name')}>
+        <div className="pf-chatbot__canvas">
+          <ChatbotConversationHistoryNav
+            displayMode={ChatbotDisplayMode.fullscreen}
+            isDrawerOpen={isDrawerOpen}
+            setIsDrawerOpen={setIsDrawerOpen}
+            onDrawerToggle={() => { setIsDrawerOpen((open) => !open); setSearch(''); }}
+            conversations={groups}
+            activeItemId={currentId ?? undefined}
+            onSelectActiveItem={(_e?: ReactMouseEvent, id?: string | number) => {
+              if (!generating && id) { setCurrentId(String(id)); saveConvs(convsRef.current, String(id)); setIsDrawerOpen(false); setAreSettingsOpen(false); }
+            }}
+            onNewChat={startNewChat}
+            drawerCloseButtonProps={{ 'aria-label': t('conv.closeHistory') }}
+            title={t('menu.history')}
+            newChatButtonText={t('conv.new')}
+            newChatButtonProps={{ isDisabled: generating }}
+            handleTextInputChange={(v: string) => setSearch(v)}
+            searchInputPlaceholder={t('conv.search')}
+            searchInputAriaLabel={t('conv.search')}
+            emptyState={convs.length ? undefined : { titleText: t('conv.empty'), headingLevel: 'h4' }}
+            noResultsState={convs.length && search.trim() && !Object.keys(groups).length
+              ? { titleText: t('conv.noResults'), headingLevel: 'h4' } : undefined}
+            drawerContent={
+              <div className="pf-chatbot__canvas">
+                {areSettingsOpen ? (
+                  <SettingsPanel
+                    settings={settings} setSettings={(s) => { settingsRef.current = s; setSettings(s); }}
+                    models={modelChoices} model={selectedPath} onModel={(v) => onSelectModel(undefined, v)}
+                    canRestart={!generating} onClose={closeSettings}
+                    onManageModels={() => setDialog('models')} onAdvanced={() => setDialog('settings')}
+                    onRestart={() => startBackend()} onReport={() => setDialog('log')} onAbout={() => setDialog('about')}
+                  />
+                ) : (
+                  <div className="pf-chatbot__canvas-column">
+                    <ChatbotContent>
+                      <MessageBox
+                        ariaLabel={t('chat.log')}
+                        announcement={announcement}
+                        position="bottom"
+                        enableSmartScroll
+                        ref={messageBoxRef}
+                      >
+                        {notices}
+                        {(serving || !notices.length) && (
+                          <ChatbotWelcomePrompt
+                            title={t('welcome.title')}
+                            description={serving ? t('welcome.description') : t('chat.emptyStopped')}
+                            prompts={serving ? welcome : []}
+                          />
+                        )}
+                        {msgs.map((m, i) => {
+                          const pending = generating && i === msgs.length - 1 && m.role === 'assistant';
+                          const meta = statsText(m, t);
+                          return (
+                            <Message
+                              key={m.id}
+                              id={m.id}
+                              role={m.role === 'user' ? 'user' : 'bot'}
+                              name={m.role === 'user' ? t('chat.you') : t('chat.assistant')}
+                              avatar={m.role === 'user' ? userAvatar : undefined}
+                              avatarProps={m.role === 'user' ? { isBordered: true } : undefined}
+                              content={m.content}
+                              isLoading={pending && !m.content}
+                              loadingWord={t('chat.loadingWord')}
+                              botWord={t('chat.botWord')}
+                              timestamp={m.at ? new Date(m.at).toLocaleString(lang) : undefined}
+                              openLinkInNewTab
+                              codeBlockProps={{ 'aria-label': t('chat.copy') }}
+                              error={m.error ? { title: t('chat.error', { msg: m.error }) } : undefined}
+                              actions={m.role === 'assistant' && m.content && !pending ? {
+                                copy: { onClick: () => { copyText(m.content); }, tooltipContent: t('chat.copy'), clickedTooltipContent: t('chat.copied'), ariaLabel: t('chat.copy') },
+                                ...(i === lastBot && serving ? {
+                                  regenerate: { onClick: regenerate, tooltipContent: t('chat.regenerate'), ariaLabel: t('chat.regenerate'), icon: <RedoIcon /> },
+                                } : {}),
+                              } : undefined}
+                              extraContent={meta && !pending ? { afterMainContent: <Content component="small" className="msg-stats">{meta}</Content> } : undefined}
+                            />
+                          );
+                        })}
+                      </MessageBox>
+                    </ChatbotContent>
+                    <ChatbotFooter>
+                      <MessageBar
+                        onSendMessage={send}
+                        hasAttachButton={false}
+                        alwayShowSendButton
+                        hasStopButton={generating}
+                        handleStopButton={stop}
+                        isSendButtonDisabled={generating || !serving}
+                        placeholder={serving ? t('chat.placeholder') : t('chat.placeholderWait')}
+                        buttonProps={{ send: { tooltipContent: t('chat.send') }, stop: { tooltipContent: t('chat.stop') } }}
                       />
-                    );
-                  })}
-                </MessageBox>
-              </ChatbotContent>
-              <ChatbotFooter>
-                <MessageBar
-                  onSendMessage={send}
-                  hasAttachButton={false}
-                  hasStopButton={generating}
-                  handleStopButton={stop}
-                  isSendButtonDisabled={generating || !serving}
-                  placeholder={serving ? t('chat.placeholder') : t('chat.placeholderWait')}
-                  buttonProps={{ send: { tooltipContent: t('chat.send') }, stop: { tooltipContent: t('chat.stop') } }}
-                />
-                <ChatbotFootnote label={footLabel} />
-              </ChatbotFooter>
-            </>
-          }
-        />
+                      <ChatbotFootnote
+                        label={footLabel}
+                        popover={{
+                          title: t('menu.status'),
+                          description: statusRows.map(([k, v]) => t('status.row', { k, v })).join('\n'),
+                          showClose: true,
+                        }}
+                      />
+                    </ChatbotFooter>
+                  </div>
+                )}
+              </div>
+            }
+          />
+        </div>
       </Chatbot>
-      {dialog === 'status' && (
-        <StatusModal rows={statusRows} onLog={() => setDialog('log')} onClose={() => setDialog('')} />
-      )}
       {dialog === 'models' && (
         <ModelsModal models={models} error={modelsError} pull={pull} setPull={setPull} settings={settings} backend={backend}
           onRefresh={refreshModels} onUse={(p) => { useModel(p); setDialog(''); }} onClose={() => setDialog('')} />
@@ -667,10 +739,7 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
             setDialog('');
             if (pathChanged) { startBackend(); refreshModels(); }
           }}
-          onAbout={() => setDialog('about')} onClose={() => setDialog('')} />
-      )}
-      {dialog === 'lang' && (
-        <LangModal value={settings.language} onSelect={(l) => { setSettings({ ...settingsRef.current, language: l }); setDialog(''); }} onClose={() => setDialog('')} />
+          onClose={() => setDialog('')} />
       )}
       <AboutModal open={dialog === 'about'} info={info} onReport={() => setDialog('log')} onClose={() => setDialog('')} />
       {dialog === 'log' && (

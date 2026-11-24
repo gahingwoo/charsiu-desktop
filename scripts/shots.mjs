@@ -43,28 +43,27 @@ async function shot(name, { scene = 'chat', lang = 'en', dark = false, size = [1
   await ctx.close();
 }
 
-const history = async (p) => { await p.click('.pf-chatbot__button--toggle-menu'); await p.waitForTimeout(600); };
-const option = (label) => async (p) => {
-  await p.click('.pf-chatbot__button--toggle-options');
-  await p.waitForTimeout(300);
-  if (label) { await p.getByRole('menuitem', { name: label }).click(); await p.waitForTimeout(800); }
-};
+const history = async (p) => { await p.click('.pf-chatbot__canvas-history-toggle'); await p.waitForTimeout(700); };
+const settings = async (p) => { await p.locator('.pf-chatbot__canvas-docked-nav .pf-v6-c-nav__list').last().locator('button').click(); await p.waitForTimeout(700); };
+const status = async (p) => { await p.click('.pf-chatbot__footnote button'); await p.waitForTimeout(700); };
+const models = async (p) => { await settings(p); await p.click('#models'); await p.waitForTimeout(900); };
 const wide = [2560, 1440];
 
-await shot('chat-light-en');
+await shot('chat-light-zh', { lang: 'zh-CN' });
 await shot('chat-dark-zh', { lang: 'zh-CN', dark: true });
+await shot('chat-light-en');
 await shot('welcome-light-zh', { scene: 'welcome', lang: 'zh-CN' });
 await shot('welcome-dark-en', { scene: 'welcome', dark: true });
-await shot('history-light-en', { then: history });
-await shot('history-dark-zh', { lang: 'zh-CN', dark: true, then: history });
-await shot('options-light-en', { then: option() });
-await shot('status-light-en', { then: option('Status') });
-await shot('models-dark-en', { dark: true, then: option('Models') });
+await shot('history-light-zh', { lang: 'zh-CN', then: history });
+await shot('history-dark-en', { dark: true, then: history });
+await shot('settings-light-zh', { lang: 'zh-CN', then: settings });
+await shot('settings-dark-en', { dark: true, then: settings });
+await shot('status-light-zh', { lang: 'zh-CN', then: status });
+await shot('models-dark-en', { dark: true, then: models });
 await shot('loading-light-en', { scene: 'loading' });
-await shot('failed-light-en', { scene: 'failed' });
-await shot('chat-light-en-2560', { size: wide });
+await shot('failed-light-zh', { scene: 'failed', lang: 'zh-CN' });
+await shot('chat-light-zh-2560', { lang: 'zh-CN', size: wide });
 await shot('history-dark-en-2560', { dark: true, size: wide, then: history });
-await shot('welcome-light-zh-2560', { scene: 'welcome', lang: 'zh-CN', size: wide });
 
 // Two questions in a row must both be answered: after the first reply Send
 // stays available, even when a staging heartbeat arrives after "ready"

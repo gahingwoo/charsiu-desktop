@@ -1,19 +1,16 @@
-// The dialogs. The language dialog, the About box and the settings as
-// PatternFly form sections are Maskrom Studio's (src/renderer/common.tsx,
-// same author and licence), with this app's rows and fields.
+// The dialogs. The About box and the settings as PatternFly form sections
+// are Maskrom Studio's (src/renderer/common.tsx, same author and licence),
+// with this app's rows and fields.
 // SPDX-License-Identifier: GPL-2.0-only
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Button, CodeBlock, CodeBlockAction, CodeBlockCode, Content, DescriptionList, DescriptionListDescription,
-  DescriptionListGroup, DescriptionListTerm, Form, FormGroup, FormHelperText, FormSection, HelperText,
-  HelperTextItem, Menu, MenuContent, MenuItem, MenuList, Modal, ModalBody, ModalFooter, ModalHeader, Stack, TextArea,
-  TextInput, ToggleGroup, ToggleGroupItem,
+  Button, CodeBlock, CodeBlockAction, CodeBlockCode, Content, Form, FormGroup, FormHelperText, FormSection, HelperText,
+  HelperTextItem, Modal, ModalBody, ModalFooter, ModalHeader, Stack, TextArea, TextInput,
 } from '@patternfly/react-core';
 import { TimesIcon } from '@patternfly/react-icons/dist/esm/icons/times-icon';
 import { copyText, DEFAULTS, invoke, openUrl, tauri, type Info, type Settings, type Snapshot } from './api';
 import { useI18n } from './i18n';
-import { LANG_NAMES, LANGS } from './i18n-core';
 import { issueUrl, scrubbedLog } from './report';
 
 declare const __BUILD_COMMIT__: string;
@@ -27,39 +24,6 @@ export const BUILD = {
   chatbot: typeof __CHATBOT_VERSION__ === 'string' ? __CHATBOT_VERSION__ : '',
 };
 
-/*
- * The language dialog, as Cockpit's "Display language": a small modal with
- * a plain menu of the languages, each in its own language, and Select /
- * Cancel. "Follow the system" is the first entry here.
- */
-export function LangModal({ value, onSelect, onClose }: { value: string; onSelect: (l: string) => void; onClose: () => void }) {
-  const { t } = useI18n();
-  const [picked, setPicked] = useState(value || 'auto');
-  const apply = () => onSelect(picked === 'auto' ? '' : picked);
-  return (
-    <Modal isOpen variant="small" onClose={onClose} aria-labelledby="lang-dialog-title" id="lang-dialog">
-      <ModalHeader title={t('lang.dialog')} labelId="lang-dialog-title" />
-      <ModalBody>
-        <Menu isPlain isScrollable activeItemId={picked} selected={picked} onSelect={(_e, id) => setPicked(String(id))}>
-          <MenuContent>
-            <MenuList>
-              <MenuItem itemId="auto" isSelected={picked === 'auto'}>{t('settings.langAuto')}</MenuItem>
-              {LANGS.map((l) => (
-                <MenuItem key={l} itemId={l} isSelected={picked === l} lang={l}>{LANG_NAMES[l]}</MenuItem>
-              ))}
-            </MenuList>
-          </MenuContent>
-        </Menu>
-      </ModalBody>
-      <ModalFooter>
-        <Button variant="primary" onClick={apply}>{t('lang.select')}</Button>
-        <Button variant="link" onClick={onClose}>{t('common.cancel')}</Button>
-      </ModalFooter>
-    </Modal>
-  );
-}
-
-/** The "Engineered by gahingwoo" badge, as gahingwoo.com's About this site has it (Maskrom Studio's CreditBadge). */
 function CreditBadge() {
   return (
     <svg className="credit-badge" viewBox="14 0 346 110" role="img" aria-label="Engineered by gahingwoo">
@@ -95,7 +59,7 @@ export function AboutModal({ open, info, onReport, onClose }: { open: boolean; i
     <a href={href} onClick={(e) => { e.preventDefault(); openUrl(href); }}>{text}</a>
   );
   const rows: Array<[string, React.ReactNode]> = [
-    [t('about.version'), t('about.version.value', { version: info.version || '0.2.0', commit: BUILD.commit, date: BUILD.date })],
+    [t('about.version'), t('about.version.value', { version: info.version || '0.3.0', commit: BUILD.commit, date: BUILD.date })],
     [t('about.design'), `PatternFly ${BUILD.patternfly}, PatternFly Chatbot ${BUILD.chatbot}`],
     [t('about.runtime'), t('about.runtime.value')],
     [t('about.charsiu'), <span className="selectable">{info.charsiu || '-'}</span>],
@@ -136,8 +100,8 @@ export function AboutModal({ open, info, onReport, onClose }: { open: boolean; i
 }
 
 /** Settings, as PatternFly form sections (Maskrom Studio's settings dialog). */
-export function SettingsModal({ settings, info, onSave, onAbout, onClose }: {
-  settings: Settings; info: Info; onSave: (s: Settings) => void; onAbout: () => void; onClose: () => void;
+export function SettingsModal({ settings, info, onSave, onClose }: {
+  settings: Settings; info: Info; onSave: (s: Settings) => void; onClose: () => void;
 }) {
   const { t } = useI18n();
   const [s, setS] = useState<Settings>(settings);
@@ -156,7 +120,7 @@ export function SettingsModal({ settings, info, onSave, onAbout, onClose }: {
   };
   return (
     <Modal isOpen variant="medium" onClose={onClose} aria-labelledby="settings-title" id="settings-dialog">
-      <ModalHeader title={t('settings.title')} labelId="settings-title" />
+      <ModalHeader title={t('settings.advanced')} labelId="settings-title" />
       <ModalBody>
         <Form id="settings-form" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <FormSection title={t('settings.chat')} titleElement="h3">
@@ -172,36 +136,12 @@ export function SettingsModal({ settings, info, onSave, onAbout, onClose }: {
               <FormHelperText><HelperText><HelperTextItem>{t('settings.systemHelp')}</HelperTextItem></HelperText></FormHelperText>
             </FormGroup>
           </FormSection>
-          <FormSection title={t('settings.appearance')} titleElement="h3">
-            <FormGroup fieldId="set-theme" label={t('settings.theme')} role="group">
-              <ToggleGroup aria-label={t('settings.theme')} id="set-theme">
-                {(['system', 'light', 'dark'] as const).map((th) => (
-                  <ToggleGroupItem key={th} text={t(th === 'system' ? 'settings.themeSystem' : th === 'light' ? 'settings.themeLight' : 'settings.themeDark')}
-                    isSelected={s.theme === th} onChange={() => set({ theme: th })} />
-                ))}
-              </ToggleGroup>
-            </FormGroup>
-            <FormGroup fieldId="set-lang" label={t('settings.language')} role="group">
-              <ToggleGroup aria-label={t('settings.language')} id="set-lang">
-                <ToggleGroupItem text={t('settings.langAuto')} isSelected={!s.language} onChange={() => set({ language: '' })} />
-                {LANGS.map((l) => (
-                  <ToggleGroupItem key={l} text={LANG_NAMES[l]} isSelected={s.language === l} onChange={() => set({ language: l })} />
-                ))}
-              </ToggleGroup>
-            </FormGroup>
-          </FormSection>
           <FormSection title={t('settings.runtime')} titleElement="h3">
             <FormGroup label={t('settings.charsiu')} fieldId="set-charsiu">
               <TextInput id="set-charsiu" value={s.charsiuPath} placeholder={info.charsiu || ''} onChange={(_e, v) => set({ charsiuPath: v })} />
               <FormHelperText><HelperText><HelperTextItem>
                 {info.charsiu ? t('settings.charsiuHelp', { path: info.charsiu }) : t('settings.charsiuNone')}
               </HelperTextItem></HelperText></FormHelperText>
-            </FormGroup>
-          </FormSection>
-          <FormSection title={t('settings.version')} titleElement="h3">
-            <FormGroup fieldId="about-open">
-              <Content component="p">{`${info.version || '0.2.0'} (${BUILD.commit})`}</Content>
-              <Button id="about-open" variant="link" isInline onClick={onAbout}>{t('about.open')}</Button>
             </FormGroup>
           </FormSection>
         </Form>
@@ -240,7 +180,7 @@ export function LogModal({ info, backend, npuLine, model, onClose }: {
   const who = { home: info.home || '', user: info.user || '' };
   const log = lines ?? [];
   const facts = {
-    version: info.version || '0.2.0', commit: BUILD.commit, os: info.os || 'unknown',
+    version: info.version || '0.3.0', commit: BUILD.commit, os: info.os || 'unknown',
     backend: `${backend.state}${backend.problem ? ` (${backend.problem})` : ''}`, npu: npuLine, model: model || '-', what, log,
   };
   const actions = (
@@ -307,32 +247,6 @@ export function ConfirmDelete({ title, onDelete, onClose }: { title: string; onD
       <ModalFooter>
         <Button variant="danger" onClick={onDelete}>{t('common.delete')}</Button>
         <Button variant="link" onClick={onClose}>{t('common.cancel')}</Button>
-      </ModalFooter>
-    </Modal>
-  );
-}
-
-/* What the app is running on, as key and value rows: the backend, the model,
-   the NPU and the last reply's speed. The footnote under the message bar is
-   the short form of this. */
-export function StatusModal({ rows, onLog, onClose }: { rows: Array<[string, string]>; onLog: () => void; onClose: () => void }) {
-  const { t } = useI18n();
-  return (
-    <Modal isOpen variant="medium" onClose={onClose} aria-labelledby="status-title">
-      <ModalHeader title={t('menu.status')} labelId="status-title" />
-      <ModalBody>
-        <DescriptionList isHorizontal termWidth="9rem">
-          {rows.map(([k, v]) => (
-            <DescriptionListGroup key={k}>
-              <DescriptionListTerm>{k}</DescriptionListTerm>
-              <DescriptionListDescription className="selectable">{v}</DescriptionListDescription>
-            </DescriptionListGroup>
-          ))}
-        </DescriptionList>
-      </ModalBody>
-      <ModalFooter>
-        <Button variant="secondary" onClick={onLog}>{t('menu.report')}</Button>
-        <Button variant="link" onClick={onClose}>{t('common.close')}</Button>
       </ModalFooter>
     </Modal>
   );
