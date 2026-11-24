@@ -3,7 +3,9 @@ name: Build
 # Every push: the page (typecheck, build, its size), lint and tests,
 # screenshots of the page against a stand-in for the app, the Windows arm64
 # installer (NSIS) and the Linux arm64 .deb (and an AppImage, best effort).
-# A tag vX.Y.Z also attaches them to that release.
+# A push to main puts the three on the rolling `ci` pre-release (in place,
+# .github/scripts/ci-release.sh); a tag vX.Y.Z publishes them as release
+# vX.Y.Z, with SHA256SUMS.txt. Names: .github/scripts/package.sh.
 
 on:
   push:
@@ -176,17 +178,62 @@ jobs:
           name: charsiu-desktop-linux-arm64-appimage
           path: src-tauri/target/release/bundle/appimage/*.AppImage
 
+  ci-release:
+    name: The rolling ci pre-release (main)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: ci-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: charsiu-desktop-*
+          path: built
+      - name: Release names and checksums
+        run: .github/scripts/package.sh built out
+      - name: Update the ci pre-release in place
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(out/charsiu-desktop_*)
+          .github/scripts/ci-release.sh '^charsiu-desktop_' "${files[@]}"
+
   release:
-    name: Attach to the release
+    name: Release vX.Y.Z (tags)
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [lint, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          path: dist
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: dist/**/*
+          pattern: charsiu-desktop-*
+          path: built
+      - name: Release names and checksums
+        id: pkg
+        run: .github/scripts/package.sh built out
+      - name: The tag is the version
+        run: |
+          tag=${GITHUB_REF_NAME}
+          [ "$tag" = "v${{ steps.pkg.outputs.version }}" ] \
+            || { echo "tag $tag but package.json says ${{ steps.pkg.outputs.version }}"; exit 1; }
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=${GITHUB_REF_NAME}
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # a release made by hand first: add and replace, never delete it
+            gh release upload "$tag" out/* -R "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" out/* -R "$GITHUB_REPOSITORY" --verify-tag \
+              --title "Charsiu Desktop ${tag#v}" --generate-notes
+          fi

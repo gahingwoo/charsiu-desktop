@@ -31,16 +31,24 @@ Windows:
 1. Install charsiu from PowerShell (run it as administrator once, so ordinary
    users may use the NPU):
    `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
-2. Run `Charsiu Desktop_<version>_arm64-setup.exe` from the
-   `charsiu-desktop-windows-arm64` artifact of the latest
-   [Build run](https://github.com/gahingwoo/charsiu-desktop/actions/workflows/build.yml).
+2. Run `charsiu-desktop_<version>_arm64-setup.exe` from the
+   [latest release](https://github.com/gahingwoo/charsiu-desktop/releases/latest).
    It installs for the current user.
 
 Linux:
 
 1. `sudo apt install charsiu` on Armbian, or charsiu's installer elsewhere.
 2. `sudo apt install ./charsiu-desktop_<version>_arm64.deb` from the
-   `charsiu-desktop-linux-arm64-deb` artifact.
+   [latest release](https://github.com/gahingwoo/charsiu-desktop/releases/latest)
+   (or `charsiu-desktop_<version>_aarch64.AppImage`).
+
+`SHA256SUMS.txt` beside them has their checksums
+(`sha256sum -c SHA256SUMS.txt --ignore-missing`, or `Get-FileHash` on
+Windows).
+
+The newest build of main, not tested on a board, is the
+[ci pre-release](https://github.com/gahingwoo/charsiu-desktop/releases/tag/ci):
+every successful push to main replaces its files in place.
 
 Start Charsiu Desktop from the menu. The first start of a model takes about a
 minute (charsiu writes its weight cache); later starts take a few seconds.
@@ -130,6 +138,18 @@ and the "Update README pictures" workflow (`readme-shots.yml`, run by hand)
 renders and commits them.
 
 `python3 tools/make-icons.py` redraws the icons.
+
+
+### Releases
+
+Every push to main that builds publishes the three packages to the `ci`
+pre-release, in place (`.github/scripts/ci-release.sh`: upload with
+`--clobber`, merge SHA256SUMS.txt, move the tag, then remove only the
+packages the new set replaced; the release is never deleted). A release:
+set the version in `package.json`, `src-tauri/tauri.conf.json` and
+`src-tauri/Cargo.toml`, push, then push a tag `vX.Y.Z`; CI checks that the
+tag is the version and publishes release vX.Y.Z with the packages and
+SHA256SUMS.txt (on a release made by hand first, it adds and replaces).
 
 ## Testing on the board
 
