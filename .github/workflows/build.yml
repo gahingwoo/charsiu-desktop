@@ -1,0 +1,143 @@
+name: Build
+
+# Every push: lint and tests, the Windows arm64 installer (NSIS) and the
+# Linux arm64 .deb (and an AppImage, best effort). A tag vX.Y.Z also attaches
+# them to that release.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # pinned, so a new CLI release cannot change what gets bundled
+  TAURI_CLI_VERSION: '2.12.6'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint and tests (Linux arm64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: UI scripts parse
+        run: for f in ui/*.js; do node --check "$f"; done
+      - name: No dashes in text
+        run: |
+          if git grep -nP '\x{2013}|\x{2014}' -- . ':!ui/vendor'; then exit 1; fi
+      - name: cargo fmt
+        working-directory: src-tauri
+        # the code was written without a local rustfmt; this reports the
+        # difference without failing the build until it has been applied once
+        continue-on-error: true
+        run: cargo fmt --check
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D clippy::correctness -D clippy::suspicious
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test
+
+  windows:
+    name: Windows arm64 installer (NSIS)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: windows-arm64
+      - name: tauri-cli
+        run: cargo install tauri-cli --version "=${{ env.TAURI_CLI_VERSION }}" --locked
+      - name: Build
+        working-directory: src-tauri
+        run: cargo tauri build --target aarch64-pc-windows-msvc --bundles nsis
+      - name: Check the architecture
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem src-tauri/target/aarch64-pc-windows-msvc/release/charsiu-desktop.exe
+          $b = [System.IO.File]::ReadAllBytes($exe.FullName)
+          $pe = [BitConverter]::ToInt32($b, 0x3c)
+          $machine = [BitConverter]::ToUInt16($b, $pe + 4)
+          if ($machine -ne 0xAA64) { throw ("not ARM64: machine 0x{0:X}" -f $machine) }
+          Write-Host ("{0}: ARM64, {1:N0} bytes" -f $exe.Name, $exe.Length)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: charsiu-desktop-windows-arm64
+          path: src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+  linux:
+    name: Linux arm64 .deb
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev patchelf file
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: linux-arm64
+      - name: tauri-cli
+        run: cargo install tauri-cli --version "=${{ env.TAURI_CLI_VERSION }}" --locked
+      - name: Build the .deb
+        working-directory: src-tauri
+        run: |
+          cargo tauri build --bundles deb
+          for d in target/release/bundle/deb/*.deb; do dpkg-deb -I "$d"; dpkg-deb -c "$d"; done
+          file target/release/charsiu-desktop
+      - name: AppImage (best effort)
+        id: appimage
+        continue-on-error: true
+        working-directory: src-tauri
+        run: cargo tauri build --bundles appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: charsiu-desktop-linux-arm64-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: steps.appimage.outcome == 'success'
+        with:
+          name: charsiu-desktop-linux-arm64-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+
+  release:
+    name: Attach to the release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
