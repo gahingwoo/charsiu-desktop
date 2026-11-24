@@ -78,6 +78,13 @@ jobs:
           name: screenshots
           path: shots/*.png
           if-no-files-found: error
+      - name: README pictures (docs/imgs, WebP)
+        run: CHROME=$(command -v google-chrome || command -v chromium) npm run readme-shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readme-images
+          path: docs/imgs/*.webp
+          if-no-files-found: error
 
   windows:
     name: Windows arm64 installer (NSIS)

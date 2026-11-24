@@ -1,11 +1,49 @@
-# charsiu desktop
+# Charsiu Desktop
+
+[简体中文](README.zh-CN.md)
 
 A chat window for [charsiu](https://github.com/gahingwoo/charsiu), the open
-LLM runtime for the RK3576 NPU. The same app runs on Windows on Arm (the NPU
-through rknpu.sys, from
-[woa-rk3576-npu](https://github.com/gahingwoo/woa-rk3576-npu)) and on Linux
-(the NPU through the mainline rocket driver). Only the charsiu underneath
-differs.
+LLM runtime for the RK3576 NPU. It runs a model on the board's NPU, keeps
+your conversations on the board and needs no network once the model is
+downloaded. The same app runs on Windows on Arm and on Linux; only the
+charsiu underneath differs.
+
+| | |
+|---|---|
+| ![A conversation with a code block](docs/imgs/chat-en.webp) | ![The welcome prompts, in Chinese](docs/imgs/welcome-zh.webp) |
+| ![The conversation history drawer](docs/imgs/history-zh.webp) | ![Dark theme](docs/imgs/dark-zh.webp) |
+
+## Requirements
+
+- An RK3576 board with charsiu installed and a model it can run (the app
+  downloads one from its Settings, Model files, if there is none).
+- Windows 11 arm64 with the rknpu driver
+  ([woa-rk3576-npu](https://github.com/gahingwoo/woa-rk3576-npu)), or
+- Linux arm64 with the mainline rocket driver (Armbian's edge kernel has it).
+
+Without the NPU driver charsiu answers on the CPU, several times slower; the
+app says so.
+
+## Install
+
+Windows:
+
+1. Install charsiu from PowerShell (run it as administrator once, so ordinary
+   users may use the NPU):
+   `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
+2. Run `Charsiu Desktop_<version>_arm64-setup.exe` from the
+   `charsiu-desktop-windows-arm64` artifact of the latest
+   [Build run](https://github.com/gahingwoo/charsiu-desktop/actions/workflows/build.yml).
+   It installs for the current user.
+
+Linux:
+
+1. `sudo apt install charsiu` on Armbian, or charsiu's installer elsewhere.
+2. `sudo apt install ./charsiu-desktop_<version>_arm64.deb` from the
+   `charsiu-desktop-linux-arm64-deb` artifact.
+
+Start Charsiu Desktop from the menu. The first start of a model takes about a
+minute (charsiu writes its weight cache); later starts take a few seconds.
 
 ## How it works
 
@@ -84,6 +122,12 @@ built page in Chrome against `scripts/mock-tauri.js`, a stand-in for the app's
 commands (`npm run shots` locally, with `CHROME=` pointing at a Chrome).
 `cargo fmt --check` is part of the lint job; the "Apply rustfmt" workflow
 (`fmt.yml`, run by hand) formats and commits.
+
+The pictures in this README are rendered the same way:
+`npm run readme-shots` writes them to `docs/imgs` as WebP. The Build
+workflow uploads a fresh set as the `readme-images` artifact on every push,
+and the "Update README pictures" workflow (`readme-shots.yml`, run by hand)
+renders and commits them.
 
 `python3 tools/make-icons.py` redraws the icons.
 

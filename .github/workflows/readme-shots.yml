@@ -1,0 +1,38 @@
+name: Update README pictures
+
+# Run by hand (Actions, "Update README pictures", Run workflow): builds the
+# page, renders the README's pictures against the stand-in for the app
+# (npm run readme-shots, into docs/imgs) and commits them to the branch it
+# ran on.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Build and render
+        run: |
+          # the Chinese pictures need a CJK font
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+          CHROME=$(command -v google-chrome || command -v chromium) npm run readme-shots
+      - name: Commit
+        run: |
+          set -eu
+          git add docs/imgs
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git config user.name gahingwoo
+          git config user.email gahing@gahingwoo.com
+          git commit -q -s -m "README pictures: render them again" -m "Applied by the Update README pictures workflow."
+          git push
