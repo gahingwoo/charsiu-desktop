@@ -55,7 +55,9 @@ cargo tauri build --target aarch64-pc-windows-msvc --bundles nsis  # Windows arm
 
 Linux needs `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
 libsoup-3.0-dev`. Windows needs Visual Studio's ARM64 build tools. MSI is not
-offered: WiX does not build arm64 installers. CI (`.github/workflows/build.yml`)
+offered: WiX does not build arm64 installers. The product is called Charsiu
+Desktop so its Debian package (`charsiu-desktop`) does not collide with the
+`charsiu` package it runs. CI (`.github/workflows/build.yml`)
 builds both and runs the tests (`cargo test`: the stderr classifier, the zoo
 parser, SSE framing, a streamed reply against a stand-in server).
 
@@ -72,10 +74,10 @@ Windows (TaishanPi 3M, Windows 11 23H2 arm64):
 1. Install charsiu: `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
    (or the branch build the release notes name). Check `charsiu "hello"` in a
    new terminal.
-2. Run the installer `charsiu_0.1.0_arm64-setup.exe` from the
+2. Run the installer `Charsiu Desktop_0.1.0_arm64-setup.exe` from the
    `charsiu-desktop-windows-arm64` artifact. It installs for the current user;
    WebView2 is already part of Windows 11.
-3. Start charsiu from the Start menu. Expected: Backend "loading the model",
+3. Start Charsiu Desktop from the Start menu. Expected: Backend "loading the model",
    then "ready (127.0.0.1:PORT)"; NPU "in use, 2 cores, driver started" and
    the per-core busy figures while a reply is written (if the counters are
    registered, see woa-rk3576-npu docs/PERFCOUNTERS.md). The first start of a
@@ -98,7 +100,7 @@ Linux (Armbian edge with rocket, or any arm64 Debian/Ubuntu with charsiu):
    `charsiu "hello"`.
 2. `sudo apt install ./charsiu-desktop_0.1.0_arm64.deb` from the
    `charsiu-desktop-linux-arm64-deb` artifact.
-3. Start "charsiu" from the menu and repeat steps 3 to 5 above. NPU shows
+3. Start Charsiu Desktop from the menu and repeat steps 3 to 5 above. NPU shows
    "rocket driver loaded, 2 of 2 cores active" while it answers.
 4. Close it and check `pgrep -a charsiu_serve` prints nothing.
 
