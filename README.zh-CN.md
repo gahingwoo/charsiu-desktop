@@ -4,6 +4,8 @@
 
 [charsiu](https://github.com/gahingwoo/charsiu) 的聊天窗口。charsiu 是在 RK3576 NPU 上运行大模型的开源运行时。模型在开发板的 NPU 上运行，对话保存在开发板上，模型下载好之后不需要联网。同一个程序可在 Windows on Arm 和 Linux 上运行，只是下面的 charsiu 不同。
 
+![提问、流式回答、复制回答和对话历史](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-zh-CN.gif)
+
 | | |
 |---|---|
 | ![带代码块的对话](docs/imgs/chat-en.webp) | ![欢迎提示](docs/imgs/welcome-zh.webp) |
@@ -48,7 +50,7 @@ cargo tauri build --target aarch64-pc-windows-msvc --bundles nsis  # Windows arm
 
 Linux 需要 `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev`，Windows 需要 Visual Studio 的 ARM64 构建工具。更多细节（工作原理、CI、在开发板上的测试步骤）见英文 [README](README.md)。
 
-本页截图由 `npm run readme-shots` 生成（Chrome 加模拟后端），写到 `docs/imgs`。
+本页截图由 `npm run readme-shots` 生成（Chrome 加模拟后端），写到 `docs/imgs`。顶部的动图由 `npm run demo-gif` 录制（同样的模拟后端，需要 ffmpeg），每次推送到 main 时由 CI 重新录制，作为 `readme-media` 分支的唯一提交强制推送，不进入 main 的历史。
 
 ## 许可证
 
