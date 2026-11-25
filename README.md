@@ -2,11 +2,10 @@
 
 [简体中文](README.zh-CN.md)
 
-A chat window for [charsiu](https://github.com/gahingwoo/charsiu), the open
-LLM runtime for the RK3576 NPU. It runs a model on the board's NPU, keeps
-your conversations on the board and needs no network once the model is
-downloaded. The same app runs on Windows on Arm and on Linux; only the
-charsiu underneath differs.
+A chat window for [charsiu](https://github.com/gahingwoo/charsiu), the LLM
+runtime for the RK3576 NPU. The model runs on the board, conversations stay
+on the board, and no network is needed once a model is downloaded. The same
+app runs on Windows on Arm and on Linux.
 
 ![Asking a question, the streamed reply, copying it, exporting it as Markdown and the history drawer](https://github.com/gahingwoo/charsiu-desktop/raw/readme-media/demo-en.gif)
 
@@ -15,23 +14,34 @@ charsiu underneath differs.
 | ![A conversation with a code block](docs/imgs/chat-en.webp) | ![The welcome prompts, in Chinese](docs/imgs/welcome-zh.webp) |
 | ![The conversation history drawer](docs/imgs/history-zh.webp) | ![Dark theme](docs/imgs/dark-zh.webp) |
 
+## Status
+
+| Feature | Status |
+|---|---|
+| Streamed chat, Stop, Copy, Regenerate | CI only |
+| Conversation history (saved locally, search, rename, delete) | CI only |
+| Export a conversation as Markdown | CI only |
+| Model list and download (`charsiu pull`) | CI only |
+| NPU status in the footnote (Windows and Linux) | CI only |
+| English and Simplified Chinese | CI only |
+
 ## Requirements
 
-- An RK3576 board with charsiu installed and a model it can run (the app
-  downloads one from its Settings, Model files, if there is none).
+- An RK3576 board with charsiu installed. A model can be downloaded from
+  Settings, Model files.
 - Windows 11 arm64 with the rknpu driver
-  ([woa-rk3576-npu](https://github.com/gahingwoo/woa-rk3576-npu)), or
-- Linux arm64 with the mainline rocket driver (Armbian's edge kernel has it).
+  ([woa-rk3576-npu](https://github.com/gahingwoo/woa-rk3576-npu)), or Linux
+  arm64 with the mainline rocket driver (Armbian's edge kernel has it).
 
-Without the NPU driver charsiu answers on the CPU, several times slower; the
-app says so.
+Without the NPU driver charsiu answers on the CPU, several times slower, and
+the app says so.
 
 ## Install
 
 Windows:
 
-1. Install charsiu from PowerShell (run it as administrator once, so ordinary
-   users may use the NPU):
+1. Install charsiu from PowerShell. Run it as administrator once so ordinary
+   users may use the NPU:
    `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
 2. Run `charsiu-desktop_<version>_arm64-setup.exe` from the
    [latest release](https://github.com/gahingwoo/charsiu-desktop/releases/latest).
@@ -41,177 +51,25 @@ Linux:
 
 1. `sudo apt install charsiu` on Armbian, or charsiu's installer elsewhere.
 2. `sudo apt install ./charsiu-desktop_<version>_arm64.deb` from the
-   [latest release](https://github.com/gahingwoo/charsiu-desktop/releases/latest)
-   (or `charsiu-desktop_<version>_aarch64.AppImage`).
+   [latest release](https://github.com/gahingwoo/charsiu-desktop/releases/latest),
+   or use `charsiu-desktop_<version>_aarch64.AppImage`.
 
-`SHA256SUMS.txt` beside them has their checksums
+Check downloads against `SHA256SUMS.txt`
 (`sha256sum -c SHA256SUMS.txt --ignore-missing`, or `Get-FileHash` on
-Windows).
+Windows). The newest build of main, not tested on a board, is the
+[ci pre-release](https://github.com/gahingwoo/charsiu-desktop/releases/tag/ci).
 
-The newest build of main, not tested on a board, is the
-[ci pre-release](https://github.com/gahingwoo/charsiu-desktop/releases/tag/ci):
-every successful push to main replaces its files in place.
+The first start of a model takes about a minute while charsiu writes its
+weight cache. Later starts take a few seconds.
 
-Start Charsiu Desktop from the menu. The first start of a model takes about a
-minute (charsiu writes its weight cache); later starts take a few seconds.
+Conversations and settings are JSON files in
+`%APPDATA%\com.gahingwoo.charsiu-desktop` (Windows) or
+`~/.local/share/com.gahingwoo.charsiu-desktop` (Linux). Nothing is uploaded.
 
-## How it works
-
-The app is a front end and nothing more. It does not contain a model runtime.
-
-- It starts `charsiu serve --host 127.0.0.1 --port 0` and reads the port the
-  server picked from its stderr (`charsiu_serve: ready on http://...`). The
-  model stays loaded between questions; it is restarted only when you pick
-  another model (`CHARSIU_MODEL=<path>`).
-- Each question is one `POST /v1/chat/completions` with `stream: true`,
-  charsiu's OpenAI compatible endpoint. The request is made from Rust, not
-  from the web view, so neither WebView2's nor WebKitGTK's cross-origin rules
-  are involved. Stop closes the connection, and charsiu stops generating when
-  its next write fails.
-- Models are listed with `charsiu pull --zoo` and downloaded with
-  `charsiu pull NAME`, which verifies the file and keeps it only if charsiu
-  can run it. The progress bar is the size of the `.part` file it writes.
-- Tokens per second and the time to the first token are measured in the app
-  from when each streamed token arrives.
-- NPU state: on Windows, the PnP state of `ACPI\RKCP3576\0` and rknpu.sys's
-  `RK3576 NPU` performance counters (busy time per core); on Linux, the accel
-  node, the rocket module, each core's runtime power state and the NPU rail.
-- On Windows the front door is `charsiu.ps1`, so the server runs as
-  powershell.exe then charsiu_serve.exe. Both go into a job object that is
-  killed with the app. On Linux the server runs in its own process group,
-  stopped when the app quits.
-- Conversations and settings are JSON files in the app's data directory
-  (`%APPDATA%\com.gahingwoo.charsiu-desktop`,
-  `~/.local/share/com.gahingwoo.charsiu-desktop`).
-- A conversation exports as a Markdown file (the title, the date, then each
-  turn, code blocks as they were) to wherever the save dialog points. Nothing
-  is uploaded.
-
-Tauri 2 with the system web view (WebView2 on Windows 11, WebKitGTK on
-Linux), because the board has 4 GB of memory and charsiu needs most of it.
-
-The page is React and the [PatternFly Chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview)
-extension, laid out as its "Fullscreen chatbot with docked navigation"
-demo: a docked rail (the conversation history toggle, the logo, New
-conversation, Export, Settings), the conversation history drawer (new chat,
-search, rename, export, delete), the message box (markdown, code blocks with copy, the typing
-indicator while a reply is read, copy and regenerate on a reply, problems as
-alerts above the conversation), the welcome prompt, the message bar (send,
-and stop while charsiu answers) and the footnote, which carries the status in
-a few words (backend, NPU, tokens/s) with the details in its popover: the
-port, the model, the NPU driver and its per-core busy figures, the last
-reply's speed. Settings are drawn in place of the conversation, as the demo
-draws its own: the model, the model files, theme, language, the reply
-settings and the charsiu program, restart, report a problem, about. Around
-it, the pieces shared with Maskrom Studio: the About box on a blurred
-backdrop, "Report a problem" with the log scrubbed of personal details, the
-theme (dark follows the system), and the rules for what is selectable. English and Simplified
-Chinese (`src/messages.ts`).
-
-## Build
-
-Node 22 and npm for the page, Rust (stable) and the Tauri CLI for the app:
-
-```
-npm ci                 # every package checked against package-lock.json
-npm run typecheck
-npm run build          # esbuild, into dist/ (Tauri embeds it)
-cargo install tauri-cli --version =2.12.6 --locked
-cd src-tauri
-cargo tauri build --bundles deb                                    # Linux arm64
-cargo tauri build --target aarch64-pc-windows-msvc --bundles nsis  # Windows arm64
-```
-
-Linux needs `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev
-libsoup-3.0-dev`. Windows needs Visual Studio's ARM64 build tools. MSI is not
-offered: WiX does not build arm64 installers. The product is called Charsiu
-Desktop so its Debian package (`charsiu-desktop`) does not collide with the
-`charsiu` package it runs.
-
-CI (`.github/workflows/build.yml`) builds the page, both packages and runs the
-tests (`cargo test`: the stderr classifier, the zoo parser, SSE framing, a
-streamed reply against a stand-in server). Its `screenshots` job renders the
-built page in Chrome against `scripts/mock-tauri.js`, a stand-in for the app's
-commands (`npm run shots` locally, with `CHROME=` pointing at a Chrome).
-`cargo fmt --check` is part of the lint job; the "Apply rustfmt" workflow
-(`fmt.yml`, run by hand) formats and commits.
-
-The pictures in this README are rendered the same way:
-`npm run readme-shots` writes them to `docs/imgs` as WebP. The Build
-workflow uploads a fresh set as the `readme-images` artifact on every push,
-and the "Update README pictures" workflow (`readme-shots.yml`, run by hand)
-renders and commits them.
-
-The walkthrough GIF at the top is recorded by `npm run demo-gif` (the same
-page and stand-in, driven through Chrome, frames from its screencast,
-ffmpeg for the GIF; needs `ffmpeg` on the PATH). The "README walkthrough
-GIF" workflow (`demo-gif.yml`) records it in English and Chinese on every
-push to main and force-pushes them as the only commit of the `readme-media`
-branch, so the GIFs never add to the history of main.
-
-`python3 tools/make-icons.py` redraws the icons.
-
-
-### Releases
-
-Every push to main that builds publishes the three packages to the `ci`
-pre-release, in place (`.github/scripts/ci-release.sh`: upload with
-`--clobber`, merge SHA256SUMS.txt, move the tag, then remove only the
-packages the new set replaced; the release is never deleted). A release:
-set the version in `package.json`, `src-tauri/tauri.conf.json` and
-`src-tauri/Cargo.toml`, push, then push a tag `vX.Y.Z`; CI checks that the
-tag is the version and publishes release vX.Y.Z with the packages and
-SHA256SUMS.txt (on a release made by hand first, it adds and replaces).
-
-## Testing on the board
-
-The app needs a charsiu new enough to have `charsiu pull --zoo` and
-`charsiu serve --port 0`.
-
-Windows (TaishanPi 3M, Windows 11 23H2 arm64):
-
-1. Install charsiu: `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
-   (or the branch build the release notes name). Check `charsiu "hello"` in a
-   new terminal.
-2. Run the installer `Charsiu Desktop_0.3.0_arm64-setup.exe` from the
-   `charsiu-desktop-windows-arm64` artifact. It installs for the current user;
-   WebView2 is already part of Windows 11.
-3. Start Charsiu Desktop from the Start menu. Expected, in the footnote under
-   the message bar: "Loading the model", then "Ready · NPU in use, 2 cores";
-   its popover has the port, the model and "driver started" with
-   the per-core busy figures while a reply is written (if the counters are
-   registered, see woa-rk3576-npu docs/PERFCOUNTERS.md). The first start of a
-   model takes about a minute (quantising, writing the weight cache); later
-   starts a few seconds.
-4. Ask something (or click a welcome prompt); check the typing indicator,
-   then the reply streams, Stop ends it within a token or two, Copy and
-   Regenerate work, a code block has its own copy button, and the footnote
-   shows tokens/s (M7 measured 14 to 16 on Llama 3.2 1B); the first-token
-   time is under each reply. If config.ini names a model outside the models folder (for example
-   R:\npu\Llama-3.2-1B-Instruct-Q8_0.gguf), Settings, Model lists it as
-   the config's model.
-5. Conversations: open the drawer, start a new chat, search, rename and
-   delete one; restart the app and check they are still there.
-6. Models: download smollm2-135m-q4 (92 MB), watch the progress, Use it, and
-   check the backend restarts with it. Remove it again.
-7. As a user without access to the NPU device (rknpu.sys admits
-   administrators only unless the installer set it otherwise), expect the
-   warning "The NPU needs administrator rights" and replies on the CPU.
-8. Settings, Report a problem: the log shows with the user folder replaced by
-   ~, and the button opens a GitHub issue in the browser.
-9. Close the app and check in Task Manager that no charsiu_serve.exe or
-   powershell.exe is left.
-
-Linux (Armbian edge with rocket, or any arm64 Debian/Ubuntu with charsiu):
-
-1. `sudo apt install charsiu` (Armbian) or charsiu's installer, then
-   `charsiu "hello"`.
-2. `sudo apt install ./charsiu-desktop_0.3.0_arm64.deb` from the
-   `charsiu-desktop-linux-arm64-deb` artifact.
-3. Start Charsiu Desktop from the menu and repeat steps 3 to 6 above. NPU shows
-   "rocket driver loaded, 2 of 2 cores active" while it answers.
-4. Close it and check `pgrep -a charsiu_serve` prints nothing.
+How it works, building, CI, releases and the board test checklist:
+[docs/development.md](docs/development.md).
 
 ## Licence
 
-GPL-2.0-only. PatternFly and the PatternFly Chatbot are MIT, bundled into dist/ at build time (esbuild writes their licence comments to dist/app.js.LEGAL.txt).
+GPL-2.0-only. PatternFly and the PatternFly Chatbot are MIT, bundled into
+dist/ at build time (their licence comments are in dist/app.js.LEGAL.txt).
