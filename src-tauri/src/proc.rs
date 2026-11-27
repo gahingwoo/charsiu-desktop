@@ -3,7 +3,8 @@
 // Finding and running charsiu's front door, and making sure what it starts
 // dies with it.
 //
-// Windows: the front door is charsiu.ps1, so the process tree is
+// Windows: the front door is charsiu.ps1 (windows_candidates says where it
+// is looked for), so the process tree is
 // powershell.exe -> charsiu_serve.exe. Killing powershell alone would leave
 // the server holding the NPU, so every child goes into a job object that
 // kills the whole tree when it is closed, including when this app crashes.
@@ -26,28 +27,61 @@ pub fn charsiu_path(override_path: &str) -> Result<PathBuf, String> {
             Err(format!("{o} does not exist"))
         };
     }
-    for p in candidates() {
-        if p.is_file() {
-            return Ok(p);
-        }
+    match first_file(candidates()) {
+        Some(p) => Ok(p),
+        None => Err("charsiu is not installed".into()),
     }
-    Err("charsiu is not installed".into())
+}
+
+fn first_file(c: Vec<PathBuf>) -> Option<PathBuf> {
+    c.into_iter().find(|p| p.is_file())
 }
 
 #[cfg(windows)]
 fn candidates() -> Vec<PathBuf> {
+    let path: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|p| std::env::split_paths(&p).collect())
+        .unwrap_or_default();
+    windows_candidates(
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from),
+        std::env::var_os("ProgramFiles").map(PathBuf::from),
+        &path,
+    )
+}
+
+/// Where the front door is looked for on Windows, in this order:
+/// - `%LOCALAPPDATA%\Programs\charsiu\charsiu.ps1`, charsiu-install.ps1's
+///   per-user install, which someone installed on purpose;
+/// - `%ProgramFiles%\RK3576\npu\charsiu.ps1`, the RK3576 tools' copy
+///   (woa-rk3576 tools/rk3576-tools; Maskrom Studio installs it);
+/// - on PATH, a `charsiu.ps1`, or the `charsiu.ps1` one folder above a
+///   `bin\charsiu.cmd` (both installs put only that shim on PATH, and the
+///   app runs the script itself, not through cmd).
+///
+/// Not cfg(windows), so its tests run everywhere.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn windows_candidates(
+    local_app_data: Option<PathBuf>,
+    program_files: Option<PathBuf>,
+    path: &[PathBuf],
+) -> Vec<PathBuf> {
     let mut v = Vec::new();
-    if let Some(l) = std::env::var_os("LOCALAPPDATA") {
-        v.push(
-            Path::new(&l)
-                .join("Programs")
-                .join("charsiu")
-                .join("charsiu.ps1"),
-        );
+    if let Some(l) = local_app_data {
+        v.push(l.join("Programs").join("charsiu").join("charsiu.ps1"));
     }
-    if let Some(path) = std::env::var_os("PATH") {
-        for d in std::env::split_paths(&path) {
-            v.push(d.join("charsiu.ps1"));
+    if let Some(pf) = program_files {
+        v.push(pf.join("RK3576").join("npu").join("charsiu.ps1"));
+    }
+    for d in path {
+        v.push(d.join("charsiu.ps1"));
+        let is_bin = d
+            .file_name()
+            .map(|n| n.eq_ignore_ascii_case("bin"))
+            .unwrap_or(false);
+        if is_bin && d.join("charsiu.cmd").is_file() {
+            if let Some(up) = d.parent() {
+                v.push(up.join("charsiu.ps1"));
+            }
         }
     }
     v
@@ -325,5 +359,117 @@ mod win {
             // JOBOBJECT_EXTENDED_LIMIT_INFORMATION is 144 bytes on 64-bit Windows
             assert_eq!(std::mem::size_of::<super::ExtendedLimit>(), 144);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{first_file, windows_candidates};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    struct Tmp(PathBuf);
+    impl Tmp {
+        fn new(name: &str) -> Tmp {
+            let name = format!("charsiu-desktop-{name}-{}", std::process::id());
+            let d = std::env::temp_dir().join(name);
+            let _ = fs::remove_dir_all(&d);
+            fs::create_dir_all(&d).unwrap();
+            Tmp(d)
+        }
+        fn file(&self, rel: &[&str]) -> PathBuf {
+            let p = rel.iter().fold(self.0.clone(), |p, r| p.join(r));
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, b"#").unwrap();
+            p
+        }
+        fn dir(&self, rel: &[&str]) -> PathBuf {
+            let p = rel.iter().fold(self.0.clone(), |p, r| p.join(r));
+            fs::create_dir_all(&p).unwrap();
+            p
+        }
+    }
+    impl Drop for Tmp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn find(t: &Tmp, path: &[PathBuf]) -> Option<PathBuf> {
+        first_file(windows_candidates(
+            Some(t.0.join("Local")),
+            Some(t.0.join("Program Files")),
+            path,
+        ))
+    }
+
+    fn tools(t: &Tmp) -> PathBuf {
+        t.file(&["Program Files", "RK3576", "npu", "bin", "charsiu.cmd"]);
+        t.file(&["Program Files", "RK3576", "npu", "charsiu.ps1"])
+    }
+
+    #[test]
+    fn nothing_installed() {
+        let t = Tmp::new("none");
+        let other = t.dir(&["Windows", "System32"]);
+        assert_eq!(find(&t, &[other]), None);
+    }
+
+    #[test]
+    fn the_rk3576_tools_alone() {
+        let t = Tmp::new("tools");
+        let ps1 = tools(&t);
+        assert_eq!(find(&t, &[]), Some(ps1));
+    }
+
+    #[test]
+    fn the_users_own_install_comes_first() {
+        let t = Tmp::new("both");
+        tools(&t);
+        let own = t.file(&["Local", "Programs", "charsiu", "charsiu.ps1"]);
+        assert_eq!(find(&t, &[]), Some(own));
+    }
+
+    #[test]
+    fn a_bin_charsiu_cmd_on_path_means_the_script_above_it() {
+        let t = Tmp::new("path");
+        t.file(&["D", "charsiu", "bin", "charsiu.cmd"]);
+        let ps1 = t.file(&["D", "charsiu", "charsiu.ps1"]);
+        let bin = t.0.join("D").join("charsiu").join("bin");
+        // ProgramFiles elsewhere, nothing in it
+        let got = first_file(windows_candidates(None, Some(t.0.join("none")), &[bin]));
+        assert_eq!(got, Some(ps1));
+    }
+
+    #[test]
+    fn a_script_above_some_other_bin_is_not_taken() {
+        let t = Tmp::new("otherbin");
+        t.dir(&["X", "bin"]);
+        t.file(&["X", "charsiu.ps1"]);
+        let bin = t.0.join("X").join("bin");
+        assert_eq!(first_file(windows_candidates(None, None, &[bin])), None);
+    }
+
+    #[test]
+    fn a_charsiu_ps1_on_path() {
+        let t = Tmp::new("ps1path");
+        let ps1 = t.file(&["Y", "charsiu.ps1"]);
+        let y = Path::new(&t.0).join("Y");
+        assert_eq!(first_file(windows_candidates(None, None, &[y])), Some(ps1));
+    }
+
+    #[test]
+    fn the_order() {
+        let v = windows_candidates(
+            Some(PathBuf::from("L")),
+            Some(PathBuf::from("P")),
+            &[PathBuf::from("Q")],
+        );
+        let l = PathBuf::from("L").join("Programs");
+        let p = PathBuf::from("P").join("RK3576");
+        assert_eq!(v.len(), 3);
+        assert_eq!(v[0], l.join("charsiu").join("charsiu.ps1"));
+        assert_eq!(v[1], p.join("npu").join("charsiu.ps1"));
+        assert_eq!(v[2], PathBuf::from("Q").join("charsiu.ps1"));
     }
 }

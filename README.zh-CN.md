@@ -33,9 +33,11 @@
 
 Windows：
 
-1. 在 PowerShell 中安装 charsiu。第一次以管理员身份运行，这样普通用户也能使用 NPU：
+1. 安装 charsiu。Maskrom Studio 会安装 RK3576 工具包（其中带有 charsiu：`%ProgramFiles%\RK3576\npu`，`charsiu` 命令在 Path 上）和本程序。没有工具包时，在 PowerShell 中安装，第一次以管理员身份运行，这样普通用户也能使用 NPU：
    `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
 2. 从[最新版本](https://github.com/gahingwoo/charsiu-desktop/releases/latest)运行 `charsiu-desktop_<版本>_arm64-setup.exe`，它安装到当前用户。
+
+两种安装之后都要重启一次，普通用户才能使用 NPU。在那之前程序用 CPU 回答，并提供“以管理员身份重新启动”。
 
 Linux：
 

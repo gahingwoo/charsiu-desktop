@@ -3,6 +3,7 @@
 // charsiu desktop: a chat window over `charsiu serve`.
 
 mod backend;
+mod elevate;
 mod export;
 mod http;
 mod models;
@@ -41,6 +42,9 @@ struct Info {
     /// from the log before anything leaves the computer
     home: String,
     user: String,
+    /// Windows: this app runs as administrator (it then gets the NPU even
+    /// before UserAccess takes effect)
+    elevated: bool,
 }
 
 #[tauri::command]
@@ -57,7 +61,17 @@ fn app_info(app: AppHandle) -> Info {
         user: std::env::var("USERNAME")
             .or_else(|_| std::env::var("USER"))
             .unwrap_or_default(),
+        elevated: elevate::is_elevated(),
     }
+}
+
+/// Start this app again as administrator (a UAC prompt), and quit this
+/// one when Windows says it started (elevate.rs).
+#[tauri::command]
+fn relaunch_as_admin(app: AppHandle) -> Result<(), String> {
+    elevate::relaunch()?;
+    app.exit(0);
+    Ok(())
 }
 
 /// Open a link in the system's browser. Only https links to the places the
@@ -205,6 +219,7 @@ async fn export_markdown(
 }
 
 pub fn run() {
+    elevate::wait_for_previous();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(App::default())
@@ -227,6 +242,7 @@ pub fn run() {
             save_conversations,
             export_markdown,
             open_url,
+            relaunch_as_admin,
         ])
         .build(tauri::generate_context!())
         .expect("charsiu desktop failed to start")

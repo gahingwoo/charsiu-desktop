@@ -41,6 +41,10 @@ pub fn classify(line: &str) -> Option<Line> {
         }
         return Some(Line::DriverMissing);
     }
+    // the front door's own warning, before charsiu_serve tries
+    if l.contains("lets only administrators use the NPU") {
+        return Some(Line::AdminNeeded);
+    }
     if l.contains("no NPU; staying on the CPU") {
         return Some(Line::NpuOff);
     }
@@ -316,6 +320,10 @@ mod tests {
         );
         assert_eq!(
             classify("charsiu: cannot open \\\\.\\RKNPU (Windows error 5): run as administrator"),
+            Some(Line::AdminNeeded)
+        );
+        assert_eq!(
+            classify("[charsiu] WARN: rknpu.sys lets only administrators use the NPU here. Run charsiu-install.ps1 once from an administrator PowerShell (it lets ordinary users use the NPU, then restart), or run this from an administrator terminal. This run uses the CPU."),
             Some(Line::AdminNeeded)
         );
         assert_eq!(

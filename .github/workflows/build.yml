@@ -235,6 +235,26 @@ jobs:
             # a release made by hand first: add and replace, never delete it
             gh release upload "$tag" out/* -R "$GITHUB_REPOSITORY" --clobber
           else
+            # the notes written for it (docs/releases/vX.Y.Z.md), else GitHub's
+            notes=(--generate-notes)
+            [ -f "docs/releases/$tag.md" ] && notes=(--notes-file "docs/releases/$tag.md")
             gh release create "$tag" out/* -R "$GITHUB_REPOSITORY" --verify-tag \
-              --title "Charsiu Desktop ${tag#v}" --generate-notes
+              --title "Charsiu Desktop ${tag#v}" "${notes[@]}"
           fi
+      - name: SHA256SUMS.txt agrees with what GitHub serves
+        # v0.3.0's was uploaded before its files were replaced, and Maskrom
+        # Studio has to pin that installer: never again
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=${GITHUB_REF_NAME}
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" \
+            --jq '.assets[] | "\(.digest | ltrimstr("sha256:"))  \(.name)"' > served.txt
+          gh release download "$tag" -R "$GITHUB_REPOSITORY" -p SHA256SUMS.txt -O - > sums.txt
+          cat sums.txt
+          # every file in SHA256SUMS.txt is on the release with that digest
+          while read -r sum name; do
+            grep -qxF "$sum  $name" served.txt || { echo "$name: SHA256SUMS.txt says $sum, GitHub serves $(grep -F "  $name" served.txt)"; exit 1; }
+          done < sums.txt
+          # and every package built is in it
+          for f in out/*; do n=$(basename "$f"); [ "$n" = SHA256SUMS.txt ] || grep -q "  $n\$" sums.txt || { echo "$n is not in SHA256SUMS.txt"; exit 1; }; done

@@ -23,7 +23,17 @@ The app is a front end; it contains no model runtime.
   node, the rocket module, each core's runtime power state and the NPU rail.
 - On Windows the server is started through `charsiu.ps1` (powershell.exe,
   then charsiu_serve.exe); both go into a job object that is killed with the
-  app. On Linux the server runs in its own process group, stopped when the
+  app. The script is looked for in `%LOCALAPPDATA%\Programs\charsiu`
+  (charsiu-install.ps1), then `%ProgramFiles%\RK3576\npu` (the RK3576
+  tools), then on PATH (a `charsiu.ps1`, or the one above a
+  `bin\charsiu.cmd`); Settings can name another. The script sets the NPU
+  variables (`CHARSIU_NPU` and the rest) from the user's config, so the app
+  sets none itself, and a config that turns the NPU off is obeyed.
+- When the NPU admits only administrators (rknpu.sys reads UserAccess when
+  the device starts, so until the restart after an install), the notice
+  offers Restart as administrator: the app starts itself again through a
+  UAC prompt with `--after-pid`, and the new one waits for the old one to
+  exit (WebView2 will not share its data folder across elevations). On Linux the server runs in its own process group, stopped when the
   app quits.
 - Conversations and settings are JSON files in the app's data directory
   (`%APPDATA%\com.gahingwoo.charsiu-desktop`,
@@ -99,7 +109,9 @@ For a release: set the version in `package.json`,
 `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, push, then push tag
 `vX.Y.Z`. CI checks that the tag matches the version and publishes release
 vX.Y.Z with the packages and SHA256SUMS.txt (if the release was made by hand
-first, it adds and replaces files).
+first, it adds and replaces files), with `docs/releases/vX.Y.Z.md` as its
+notes when that file exists, then checks SHA256SUMS.txt against the digest
+GitHub serves for each file.
 
 ## Testing on the board
 
@@ -129,7 +141,9 @@ Windows (TaishanPi 3M, Windows 11 23H2 arm64):
    check the backend restarts with it, then remove it.
 7. As a user without access to the NPU device (rknpu.sys admits
    administrators only unless the installer set otherwise), expect "The NPU
-   needs administrator rights" and replies on the CPU.
+   needs administrator rights" and replies on the CPU. Restart as
+   administrator: a UAC prompt, the app comes back elevated and the footnote
+   shows the NPU in use.
 8. Settings, Report a problem: the log shows the user folder as ~, and the
    button opens a GitHub issue in the browser.
 9. Close the app; Task Manager shows no charsiu_serve.exe or powershell.exe.
