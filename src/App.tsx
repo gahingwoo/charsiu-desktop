@@ -473,7 +473,11 @@ export function App({ settings, setSettings }: { settings: Settings; setSettings
     }
   } else if (backend.state === 'ready' || backend.state === 'loading') {
     if (backend.npuProblem === 'admin') {
-      notices.push(<ChatbotAlert key="n" variant="warning" title={t('problem.adminNeeded')}><p>{t('problem.adminNeededBody')}</p>{code(INSTALL.windows)}</ChatbotAlert>);
+      // a restart of Windows fixes it for good (UserAccess), this app as administrator fixes it now
+      const elevate = win && !info.elevated
+        ? [<AlertActionLink key="admin" onClick={() => { invoke('relaunch_as_admin').catch((e) => console.error('relaunch_as_admin', e)); }}>{t('problem.restartAdmin')}</AlertActionLink>]
+        : [];
+      notices.push(<ChatbotAlert key="n" variant="warning" title={t('problem.adminNeeded')} actionLinks={elevate}><p>{t('problem.adminNeededBody')}</p>{code(INSTALL.windows)}</ChatbotAlert>);
     } else if (backend.npuProblem === 'driver' || (backend.npu === 'off' && win && backend.state === 'ready')) {
       notices.push(
         <ChatbotAlert key="n" variant="warning" title={t('problem.driverWin')}

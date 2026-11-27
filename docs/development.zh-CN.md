@@ -11,7 +11,8 @@
 - 模型列表来自 `charsiu pull --zoo`，下载用 `charsiu pull NAME`，它会校验文件，只有 charsiu 能运行时才保留。进度条按 `.part` 文件的大小显示。
 - 每秒 token 数和首个 token 的时间由程序根据每个流式 token 到达的时间测量。
 - Windows 上的 NPU 状态：`ACPI\RKCP3576\0` 的 PnP 状态和 rknpu.sys 的 `RK3576 NPU` 性能计数器（每个核心的忙碌时间）。Linux 上：accel 节点、rocket 模块、每个核心的运行时电源状态和 NPU 电源轨。
-- Windows 上服务通过 `charsiu.ps1` 启动（powershell.exe，然后 charsiu_serve.exe），两者放进一个作业对象，随程序一起结束。Linux 上服务在自己的进程组中运行，程序退出时停止。
+- Windows 上服务通过 `charsiu.ps1` 启动（powershell.exe，然后 charsiu_serve.exe），两者放进一个作业对象，随程序一起结束。查找顺序：`%LOCALAPPDATA%\Programs\charsiu`（charsiu-install.ps1），`%ProgramFiles%\RK3576\npu`（RK3576 工具包），然后是 PATH（`charsiu.ps1`，或 `bin\charsiu.cmd` 上一级的那个）；也可以在设置里指定。NPU 环境变量（`CHARSIU_NPU` 等）由脚本根据用户配置设置，程序自己不设，所以配置里关掉 NPU 也会生效。
+- NPU 只允许管理员时（rknpu.sys 在设备启动时读取 UserAccess，所以安装后到重启之前都是这样），提示里有“以管理员身份重新启动”：程序通过 UAC 以 `--after-pid` 重新启动自己，新实例等旧实例退出（WebView2 不能在不同权限之间共用数据目录）。Linux 上服务在自己的进程组中运行，程序退出时停止。
 - 对话和设置是程序数据目录中的 JSON 文件（`%APPDATA%\com.gahingwoo.charsiu-desktop`、`~/.local/share/com.gahingwoo.charsiu-desktop`）。导出时写一个 Markdown 文件（标题、日期、每一轮对话，代码块保持原样），保存到保存对话框选择的位置。
 
 使用 Tauri 2 和系统网页视图（Windows 11 上是 WebView2，Linux 上是 WebKitGTK），因为开发板只有 4 GB 内存，charsiu 需要其中大部分。页面使用 React 和 [PatternFly Chatbot](https://www.patternfly.org/patternfly-ai/chatbot/overview) 扩展，布局沿用其 “Fullscreen chatbot with docked navigation” 示例。消息栏下方的页脚显示后端、NPU 和 tokens/s，弹出框中有端口、模型、NPU 驱动状态、每个核心的忙碌数据和上一次回答的速度。设置项：模型、模型文件、主题、语言、回答设置、charsiu 程序、重启、报告问题、关于。“关于”框、“报告问题”（日志中去掉个人信息）、主题（深色跟随系统）和文字选择规则与 Maskrom Studio 共用。界面文字在 `src/messages.ts`。
@@ -51,7 +52,7 @@ README 截图：`npm run readme-shots` 以 WebP 格式写到 `docs/imgs`。每�
 
 每次推送到 main 并构建成功后，三个安装包会原地发布到 `ci` 预发布版（`.github/scripts/ci-release.sh`：用 `--clobber` 上传，合并 SHA256SUMS.txt，移动标签，然后只删除被新文件替换的旧包；预发布版本身从不删除）。
 
-正式发布：在 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 中设置版本，推送，再推送标签 `vX.Y.Z`。CI 检查标签与版本一致，然后发布 vX.Y.Z，附带安装包和 SHA256SUMS.txt（如果该版本先手动创建过，则添加并替换文件）。
+正式发布：在 `package.json`、`src-tauri/tauri.conf.json` 和 `src-tauri/Cargo.toml` 中设置版本，推送，再推送标签 `vX.Y.Z`。CI 检查标签与版本一致，然后发布 vX.Y.Z，附带安装包和 SHA256SUMS.txt（如果该版本先手动创建过，则添加并替换文件）；有 `docs/releases/vX.Y.Z.md` 时用它作发布说明，之后检查 SHA256SUMS.txt 与 GitHub 给出的每个文件的摘要一致。
 
 ## 在开发板上测试
 
@@ -65,7 +66,7 @@ Windows（泰山派 3M，Windows 11 23H2 arm64）：
 4. 提问或点击欢迎提示。检查：输入指示器、回答流式出现、“停止”在一两个 token 内结束、复制和重新生成可用、代码块有自己的复制按钮、页脚显示 tokens/s（Llama 3.2 1B 实测 14 到 16）、每个回答下有首个 token 时间。如果 config.ini 指定了模型文件夹之外的模型（例如 `R:\npu\Llama-3.2-1B-Instruct-Q8_0.gguf`），“设置”、“模型”会把它列为配置中的模型。
 5. 对话：打开抽屉，新建对话，搜索、重命名、删除；重启程序后检查对话仍在。
 6. 模型：下载 smollm2-135m-q4（92 MB），观察进度，使用它，检查后端用它重启，然后删除。
-7. 以没有 NPU 设备权限的用户运行（除非安装脚本另行设置，rknpu.sys 只允许管理员），应看到“The NPU needs administrator rights”，回答由 CPU 完成。
+7. 以没有 NPU 设备权限的用户运行（除非安装脚本另行设置，rknpu.sys 只允许管理员），应看到“The NPU needs administrator rights”，回答由 CPU 完成。点“以管理员身份重新启动”：出现 UAC 提示，程序以管理员身份重新打开，页脚显示 NPU 在用。
 8. “设置”、“报告问题”：日志中用户文件夹显示为 ~，按钮在浏览器中打开 GitHub issue。
 9. 关闭程序，任务管理器中没有残留的 charsiu_serve.exe 或 powershell.exe。
 

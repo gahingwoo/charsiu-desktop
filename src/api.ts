@@ -43,7 +43,7 @@ export interface NpuStatus {
   bufferBytes?: number | null;
   rail?: string | null;
 }
-export interface Info { os: string; version: string; charsiu: string; home?: string; user?: string }
+export interface Info { os: string; version: string; charsiu: string; home?: string; user?: string; elevated?: boolean }
 
 export interface Settings {
   temperature: number;

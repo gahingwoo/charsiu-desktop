@@ -40,12 +40,17 @@ the app says so.
 
 Windows:
 
-1. Install charsiu from PowerShell. Run it as administrator once so ordinary
+1. Install charsiu. Maskrom Studio installs the RK3576 tools, which bring it
+   (`%ProgramFiles%\RK3576\npu`, the `charsiu` command on the Path), and
+   this app. Without them, from PowerShell, as administrator once so ordinary
    users may use the NPU:
    `irm https://raw.githubusercontent.com/gahingwoo/woa-rk3576-npu/main/win/charsiu-install.ps1 | iex`
 2. Run `charsiu-desktop_<version>_arm64-setup.exe` from the
    [latest release](https://github.com/gahingwoo/charsiu-desktop/releases/latest).
    It installs for the current user.
+
+The NPU admits ordinary users from the first restart after either install.
+Until then the app answers on the CPU and offers Restart as administrator.
 
 Linux:
 
